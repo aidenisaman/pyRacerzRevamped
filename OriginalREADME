@@ -1,0 +1,101 @@
+pyRacerz 0.2
+by Jujucece <jujucece@gmail.com>
+
+pyRacerz request:
+----------------
+
+- a "recent" Python (> 2.2):
+If you have a GNU/Linux box, you should already have Python installed.
+(If not, you're surely know how to install it)
+
+For Windows, or other platform, goto <http://python.org/download/> and install the last
+version of Python.
+(Python will surely be useful for other things...)
+
+- pyGame (> 1.7):
+You should also install a "recent" version of pyGame
+<http://www.pygame.org/download.shtml>
+
+Sometimes on some GNU/Linux distros, you should also "manually" install a more recent SDL-ttf
+package, 2.0.7 instead of 2.0.6. (pyGame is a python wrapper for the SDL library)
+
+- Numeric Python (only for windows):
+<http://sourceforge.net/project/showfiles.php?group_id=1369>
+Or for more infos, goto <http://www.pygame.org/install.html>
+
+- psyCo (not required):
+psyCo is a library that increases the python code speed.
+
+If you have psyCo installed, pyRacerz will detect it and use it.
+
+
+pyRacerz has been tested on:
+---------------------------
+
+- Windows XP Pro
+- Fedora Core 3 (needs the install of the SDL_ttf-2.0.7-1)
+
+If you encounter some problems in running pyRacerz, send me an e-mail, I'll try to help you...
+
+
+To run pyRacerz:
+---------------
+
+- On GNU/Linux, simply type pyRacerz.py (and pyRacerz.py --help to have options)
+
+- On Windows, double-click on the pyRacerz.py file
+(if you want to play fullscreen, create a link to pyRacerz.py and append --fullscreen to the target)
+
+The base resolution of pyRacerz is 1024x768 but you can run it with lower resolutions with the --resolution option
+(type pyRacerz.py --help for details)
+
+Music in pyRacerz:
+-----------------
+
+If you want to listen to some musics when playing at pyRacerz, simply put your .ogg files in
+the "musics" directory
+
+Add tracks:
+----------
+
+You can add a track on pyRacerz, for that you need to create 3 files (xxxx is the name of your track) in the "tracks" directory:
+- xxxx.png is a 8-bit/color 1024 x 768 image representing the track aspect
+- xxxxF.png is a 8-bit/color 1024 x 768 image representing the track characteristics:
+ - The Red channel is used to design Checkpoints (checkpoints are color blocks with color increasing 16 by 16)
+ - The Green channel is used to know the road quality
+ - The Blue channel is not used (yet !!!)
+- xxxx.conf is a configuration file containing some datas about the track:
+ - The author
+ - The number of checkpoint
+ - The position of the 3 first cars on the track (Normal and Inverted)
+
+If everything is OK, your track will be automatically added to pyRacerz.
+
+See the existing tracks to know how to create a new one, or contact me...
+
+Add cars:
+--------
+
+You can also add your cars to pyRacerz, for that you need to creaté 2 files (x is the number of your car) in the "sprites/cars" directory:
+- carX.png representing the car
+- carXB.png representing the car with Brake Lights On
+
+If everything is OK, your car will be automatically added to pyRacerz.
+
+See the existing cars to have exemples...
+
+Replays:
+-------
+
+With pyRacerz, you can create a Replay of your race. Each Replay is in fact a file (.rep) in the "replays"
+directory.
+Please send me your best pyRacerz Replays !!!
+
+Challenge:
+---------
+
+A new game mode appears in pyRacerz 0.2: Challenge
+
+This mode is in only for Single User.
+It consists of several records on several tracks that you have to beat.
+If you achieve the Challenge mode, a bonus Track will be available.

@@ -1,0 +1,14 @@
+version 0.2  (2005-10-16)
+ - play pyRacerz with smaller resolution (--resolution option)
+ - display of the FPS
+ - usage of psyCo (if available)
+ - debug of some car movements
+ - add one track (wave)
+ - scrolling on HiScores menu
+ - display of player names at race start
+ - do not display scores for a Single Race
+ - miscellaneous debug
+ - challenge game (with a bonus track which have a special feature !!!)
+ - redraw of some tracks
+version 0.1  (2005-10-06)
+ - initial release
