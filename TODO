@@ -10,4 +10,16 @@
 - Add sounds
 - Driftings
 - Make the game RPM compatible (with datas in user home...)
-- Make a Windows .exe
+- Make a Windows .exe installer
+
+BUGS
+-AI cars when blocked or hit start driving in the opposite direction of how the track is supposed to go
+-Replays can not be saved, game crashes with an error
+-Replays can not be played gives error message in terminal but game does not crash
+
+
+Arch Spike TODO
+-Make a basic p2p demo with two blocks being controlled by different player
+-Try making a track with boundaries to maybed added to the p2p demo
+-Make a basic client server version of the block demo
+
