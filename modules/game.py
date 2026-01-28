@@ -59,6 +59,23 @@ class Game:
         print(e)
         sys.exit(1)
 
+      currentTrack = track.Track(currentTrackName[0], currentTrackName[1])
+      # --- Checkpoint scan for desert track ---
+      checkpoint_centers = []
+      if currentTrack.name == "desert":
+        checkpoint_positions = {i: [] for i in range(16, 16 * (currentTrack.nbCheckpoint + 1), 16)}
+        width, height = currentTrack.trackF.get_size()
+        for x in range(0, width, 4):
+          for y in range(0, height, 4):
+            r, g, b, *_ = currentTrack.trackF.get_at((x, y))
+            if r in checkpoint_positions:
+              checkpoint_positions[r].append((x, y))
+        for positions in checkpoint_positions.values():
+          if positions:
+            avg_x = sum(p[0] for p in positions) // len(positions)
+            avg_y = sum(p[1] for p in positions) // len(positions)
+            checkpoint_centers.append((avg_x, avg_y))
+
       # Play music
       misc.startRandomMusic()
 
@@ -79,7 +96,6 @@ class Game:
 
       # Initialise clock
       clock = pygame.time.Clock()
-
 
       # Display player names and cars blinking...
       for i in range(0, 4):
@@ -166,8 +182,22 @@ class Game:
 
       # Event loop
       while raceFinish == 0:
+        # ...event handling and game logic...
+        misc.screen.blit(currentTrack.track, (0, 0))
+        # --- Add this right after drawing the track ---
+        # Only show the next checkpoint for each player
+        if currentTrack.name == "desert":
+          checkpoint_values = list(range(16, 16 * (currentTrack.nbCheckpoint + 1), 16))
+          for play in self.listPlayer:
+            next_checkpoint_value = play.lastCheckpoint + 16
+            if next_checkpoint_value in checkpoint_values:
+              idx = checkpoint_values.index(next_checkpoint_value)
+              pos = checkpoint_centers[idx]
+              pygame.draw.circle(misc.screen, (255, 0, 0), pos, 10)
+              rect = pygame.Rect(pos[0]-10, pos[1]-10, 20, 20)
+              l.append(rect)
 
-        # Get the event keys
+        #Get the event Keys
         for event in pygame.event.get():
 
           if event.type == QUIT:
