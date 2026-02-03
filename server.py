@@ -24,7 +24,7 @@ PlayerMap = Dict[str, Dict[str, object]]
 def accept_client(listen_sock: socket.socket, selector: selectors.BaseSelector, clients: ClientMap) -> None:
     conn, addr = listen_sock.accept()
     conn.setblocking(False)
-    clients[conn] = {"addr": addr, "buffer": bytearray(), "ids": set()}
+    clients[conn] = {"addr": addr, "buffer": bytearray(), "ids": set(), "last_seen": time.time()}
     selector.register(conn, selectors.EVENT_READ)
     print(f"Client connected from {addr}")
 
@@ -58,6 +58,7 @@ def process_messages(sock: socket.socket, clients: ClientMap, players: PlayerMap
         return False
 
     buffer.extend(data)
+    clients[sock]["last_seen"] = time.time()
     while b"\n" in buffer:
         line, _, rest = buffer.partition(b"\n")
         buffer[:] = rest
@@ -67,21 +68,27 @@ def process_messages(sock: socket.socket, clients: ClientMap, players: PlayerMap
             msg = json.loads(line.decode("utf-8"))
         except json.JSONDecodeError:
             continue
-        if msg.get("type") != "state":
-            continue
-        pid = msg.get("id")
-        if pid is None:
-            continue
-        try:
-            pid_str = str(pid)
-            x = float(msg.get("x", 0.0))
-            y = float(msg.get("y", 0.0))
-        except (TypeError, ValueError):
-            continue
-        players[pid_str] = {"x": x, "y": y, "last_seen": time.time()}
-        ids: Set[str] = clients[sock].get("ids", set())  # type: ignore
-        ids.add(pid_str)
-        clients[sock]["ids"] = ids
+        mtype = msg.get("type")
+        if mtype == "state":
+            pid = msg.get("id")
+            if pid is None:
+                continue
+            try:
+                pid_str = str(pid)
+                x = float(msg.get("x", 0.0))
+                y = float(msg.get("y", 0.0))
+            except (TypeError, ValueError):
+                continue
+            players[pid_str] = {"x": x, "y": y, "last_seen": time.time()}
+            ids: Set[str] = clients[sock].get("ids", set())  # type: ignore
+            ids.add(pid_str)
+            clients[sock]["ids"] = ids
+        elif mtype == "ping":
+            pong = {"type": "pong", "t": msg.get("t", time.time())}
+            try:
+                sock.sendall((json.dumps(pong) + "\n").encode("utf-8"))
+            except (BlockingIOError, BrokenPipeError, ConnectionResetError):
+                return False
     return True
 
 
@@ -138,6 +145,12 @@ def run_server(host: str = SERVER_HOST, port: int = SERVER_PORT) -> None:
             if now - last_broadcast >= BROADCAST_INTERVAL:
                 broadcast_world(clients, players)
                 last_broadcast = now
+
+            stale_clients = [
+                sock for sock, info in clients.items() if now - info.get("last_seen", now) > CLIENT_TIMEOUT
+            ]
+            for sock in stale_clients:
+                drop_client(sock, selector, clients, players)
     except KeyboardInterrupt:
         print("Shutting down server")
     finally:

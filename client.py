@@ -24,6 +24,8 @@ LOCAL_COLOR = (90, 180, 255)
 REMOTE_COLOR = (120, 220, 140)
 SERVER_PORT = 50051
 SEND_INTERVAL = 0.05
+PING_INTERVAL = 1.0
+DISCONNECT_TIMEOUT = 3.0
 
 
 @dataclass
@@ -70,11 +72,27 @@ def send_state(sock: socket.socket, player_id: str, player: PlayerState) -> bool
         return False
 
 
-def receive_world(sock: socket.socket, player_id: str, peers: Dict[str, Tuple[float, float]], buffer: bytearray) -> bool:
+def send_ping(sock: socket.socket, player_id: str) -> bool:
+    payload = {"type": "ping", "id": player_id, "t": time.time()}
+    data = (json.dumps(payload) + "\n").encode("utf-8")
+    try:
+        sock.sendall(data)
+        return True
+    except (BlockingIOError, BrokenPipeError):
+        return False
+
+
+def receive_world(
+    sock: socket.socket,
+    player_id: str,
+    peers: Dict[str, Tuple[float, float]],
+    buffer: bytearray,
+    last_pong: float,
+) -> Tuple[bool, float]:
     try:
         chunk = sock.recv(4096)
         if chunk == b"":
-            return False
+            return False, last_pong
         buffer.extend(chunk)
     except BlockingIOError:
         pass
@@ -88,17 +106,19 @@ def receive_world(sock: socket.socket, player_id: str, peers: Dict[str, Tuple[fl
             message = json.loads(line.decode("utf-8"))
         except json.JSONDecodeError:
             continue
-        if message.get("type") != "world":
-            continue
-        players = message.get("players", {})
-        for pid, state in players.items():
-            if pid == player_id:
-                continue
-            try:
-                peers[pid] = (float(state.get("x", 0.0)), float(state.get("y", 0.0)))
-            except (TypeError, ValueError):
-                continue
-    return True
+        mtype = message.get("type")
+        if mtype == "world":
+            players = message.get("players", {})
+            for pid, state in players.items():
+                if pid == player_id:
+                    continue
+                try:
+                    peers[pid] = (float(state.get("x", 0.0)), float(state.get("y", 0.0)))
+                except (TypeError, ValueError):
+                    continue
+        elif mtype == "pong":
+            last_pong = time.time()
+    return True, last_pong
 
 
 def draw(screen: pygame.Surface, player: PlayerState, peers: Dict[str, Tuple[float, float]]) -> None:
@@ -168,6 +188,8 @@ def main_game_loop(server_address: str) -> None:
     peers: Dict[str, Tuple[float, float]] = {}
     recv_buffer = bytearray()
     last_send = 0.0
+    last_ping = 0.0
+    last_pong = time.time()
     running = True
 
     while running:
@@ -184,7 +206,19 @@ def main_game_loop(server_address: str) -> None:
                 continue
             last_send = now
 
-        if not receive_world(sock, player_id, peers, recv_buffer):
+        if now - last_ping >= PING_INTERVAL:
+            if not send_ping(sock, player_id):
+                running = False
+                continue
+            last_ping = now
+
+        alive, last_pong = receive_world(sock, player_id, peers, recv_buffer, last_pong)
+        if not alive:
+            running = False
+            continue
+
+        if now - last_pong > DISCONNECT_TIMEOUT:
+            print("Lost connection to server (timeout)")
             running = False
             continue
 
