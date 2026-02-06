@@ -25,6 +25,7 @@ import string
 import os
 import random
 import configparser
+import pygame.mixer
 #import sha
 
 from . import game
@@ -51,7 +52,11 @@ class SimpleMenu(Menu):
     self.gap = gap
     self.itemFont = itemFont
     self.listItem = listItem
-    
+    try:
+      self._click_sound = pygame.mixer.Sound(os.path.join("sounds", "click1.wav"))
+    except pygame.error:
+      self._click_sound = None
+
     # Display the Title    
     titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
 
@@ -75,12 +80,16 @@ class SimpleMenu(Menu):
           if event.key == K_ESCAPE:
             return -1
           if event.key == K_UP:
+            if self._click_sound:
+              self._click_sound.play()
             if self.select != 1:
               self.select = self.select - 1
             else:
               self.select = len(self.listItem)
             self.refresh()
           if event.key == K_DOWN:
+            if self._click_sound:
+              self._click_sound.play()
             if self.select != len(self.listItem):
               self.select = self.select + 1
             else:
