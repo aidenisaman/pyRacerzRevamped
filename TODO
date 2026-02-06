@@ -17,9 +17,27 @@ BUGS
 -Replays can not be saved, game crashes with an error
 -Replays can not be played gives error message in terminal but game does not crash
 
+Overall
+-Improve tracks/track creation
+-Local Network Multiplayer
+-Overhaul UI
+-Improve AI
+-look into adjusting the resolution 
+-
 
 Arch Spike TODO
--Make a basic p2p demo with two blocks being controlled by different player
+-Make a basic p2p demo with two blocks being controlled by different player(done)
 -Try making a track with boundaries to maybed added to the p2p demo
--Make a basic client server version of the block demo
+-Make a basic client server version of the block demo(done)
+-Look into sounds
+-Udp will be good for network to network but for local tcp will be fine.
+-get rid of pysco 
+
+Cycle 1 TODO:
+-Change Fonts
+-Implement a basic client server that lets people join and vote to select a track and race that one track
+-implement menu sounds and sounds to let the user know someone joined the server
+-
+
+
 
