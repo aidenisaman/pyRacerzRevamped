@@ -25,13 +25,19 @@ import math
 import array
 import zlib
 
-from . import track
-from . import menu
-from . import misc
+import track
+import menu
+import misc
 
 import sys
 import os
 import datetime
+
+# ===== MINIMAP SETTINGS =====
+MINIMAP_SIZE = 110
+MINIMAP_POS = None
+
+
 
 class Game:
   '''Class representing a game: Tournament or Single Race'''
@@ -45,9 +51,9 @@ class Game:
     self.maxLapNb = maxLapNb
 
   def play(self):
-
+    
     if self.gameType == None or self.listTrackName == None or self.listPlayer == None or self.maxLapNb == -1:
-      print ("Incomplete game")
+      print("Incomplete game")
       return
 
     # For each track
@@ -61,6 +67,14 @@ class Game:
 
       # Play music
       misc.startRandomMusic()
+            
+      # ===== SET MINIMAP POSITION AFTER SCREEN INIT =====
+      global MINIMAP_POS
+      MINIMAP_POS = (
+          misc.screen.get_width() - MINIMAP_SIZE - 15,
+          15
+      )
+
 
       # Put players on the rank
       # If it's the first time do Randomly
@@ -118,6 +132,18 @@ class Game:
       raceFinish = 0
 
       masterChrono = 0
+      
+      paused = False
+
+
+      self.minimap = pygame.Surface((MINIMAP_SIZE, MINIMAP_SIZE))
+      self.minimap.set_alpha(220)
+      
+      # --- HUD timing initialization (NEW) ---
+      for play in self.listPlayer:
+          play.bestChrono = 999999   # reset best lap for this race
+          play.chrono = 0            # reset lap timer
+
 
       replayArray = array.array("h")
 
@@ -163,341 +189,596 @@ class Game:
 
       sec = datetime.datetime.now().second
       nbFrame = 0
-
-      # Event loop
+      
       while raceFinish == 0:
-
-        # Get the event keys
-        for event in pygame.event.get():
-
-          if event.type == QUIT:
-            # Stop music
-            misc.stopMusic()
-            sys.exit(0)
-          elif event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-              # Stop music
-              misc.stopMusic()
-              return -1
-            for play in self.listPlayer:
-              if play.__class__.__name__ == "HumanPlayer":
-                if event.key == play.keyAccel:
-                  play.keyAccelPressed = 1
-                if event.key == play.keyBrake:
-                  play.keyBrakePressed = 1
-                if event.key == play.keyLeft:
-                  play.keyLeftPressed = 1
-                if event.key == play.keyRight:
-                  play.keyRightPressed = 1
-          elif event.type == KEYUP:
-            for play in self.listPlayer:
-              if play.__class__.__name__ == "HumanPlayer":
-                if event.key == play.keyAccel:
-                  play.keyAccelPressed = 0
-                if event.key == play.keyBrake:
-                  play.keyBrakePressed = 0
-                if event.key == play.keyLeft:
-                  play.keyLeftPressed = 0
-                if event.key == play.keyRight:
-                  play.keyRightPressed = 0
-
-        # Make some modifications on the car commands
-        for play in self.listPlayer:
-
-          # Bot players need to compute
-          if play.__class__.__name__ == "RobotPlayer":
-            play.compute()
-
-          if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
-            if play.keyAccelPressed == 1:
-              play.car.doAccel()
-            else:
-              play.car.noAccel()
-            if play.keyBrakePressed == 1:
-              play.car.doBrake()
-            else:
-              play.car.noBrake()
-            if play.keyLeftPressed == 1:
-              play.car.doLeft()
-            if play.keyRightPressed == 1:
-              play.car.doRight()
-            if play.keyLeftPressed == 0 and play.keyRightPressed == 0:
-              play.car.noWheel()
-
-        # TODO ? Manage Rect.union (oldRect and newRect of a car) to optimize !!!!
-        # Append the old rect to the dirty Rects
-        for play in self.listPlayer:
-          oldRect = play.car.rect
-          l.append(oldRect.__copy__())
-          misc.screen.blit(currentTrack.track, play.car.rect, play.car.rect)
-
-        # For each player, update positions and check checkpoints
-        for play in self.listPlayer:
-          play.car.update()
-
-          play.chrono = play.chrono + 1
-
-          # Get infos on trackFunction
-          color=currentTrack.trackF.get_at((int(play.car.x), int(play.car.y)))
-          r=color[0]
-          #b=color[2]
-
-          # Manage the checkpoints to count the nb of laps
-          if currentTrack.reverse == 0 and play.raceFinish == 0:
-            if r == play.lastCheckpoint + 16:
-              play.lastCheckpoint = r
-              #print "Checkpoint OK"
-            # We finish a lap
-            elif r == 16:
-              # OK
-              if play.lastCheckpoint == 16 * currentTrack.nbCheckpoint:
-                play.lastCheckpoint = r
-                play.nbLap = play.nbLap +1
-
-                # Get the current rank (position)
-                play.rank = bestRank[play.nbLap]
-                bestRank[play.nbLap] = bestRank[play.nbLap] + 1
-
-                # Get the best chrono   
-                if play.chrono < play.bestChrono:
-                  play.bestChrono = play.chrono
-                  popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
-                else:
-                  popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
-
-                play.chrono = 0
-
-              # NOK
-              elif play.lastCheckpoint > 16:
-                play.lastCheckpoint = r
-                popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
-                play.chrono = 0
-
-          elif currentTrack.reverse == 1 and play.raceFinish == 0:
-            if r != 0 and r == play.lastCheckpoint - 16:
-              play.lastCheckpoint = r
-              #print "Checkpoint OK"
-            # We finish a lap
-            elif r == 16 * currentTrack.nbCheckpoint:
-              # OK
-              if play.lastCheckpoint == 16:
-                play.lastCheckpoint = r
-                play.nbLap = play.nbLap +1
-
-                # Get the current rank (position)
-                play.rank = bestRank[play.nbLap]
-                bestRank[play.nbLap] = bestRank[play.nbLap] + 1
-
-                # Get the best chrono   
-                if play.chrono < play.bestChrono:
-                  play.bestChrono = play.chrono
-                  popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
-                else:
-                  popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
-
-                play.chrono = 0
-
-              # NOK
-              elif play.lastCheckpoint < 16 * currentTrack.nbCheckpoint:
-                play.lastCheckpoint = r
-                popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
-                play.chrono = 0
-
-        # Manage Collisions
-        for play in self.listPlayer:
-         for play2 in self.listPlayer:
-           if play == play2:
-             continue
-           playCollisionRects = []
-           play2CollisionRects = []
-           listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(0)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(1)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(2)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(3)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-
-           playCollisionRects.sort()
-           play2CollisionRects.sort()
-           #if playCollisionRects != []:
-             #print playCollisionRects
-           if playCollisionRects == [0]:
-             play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
-           elif playCollisionRects == [1]:
-             play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
-           elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
-             play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
-             play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects != [] :
-             #TODO
-             #print "Strange Collision !!!"
-             #print playCollisionRects
-             play.car.newSpeed = 0
         
-        for play in self.listPlayer:
-          #print play.name
-          #print play.car.speedL
-          if play.car.newSpeed != 0:
-            play.car.speed = play.car.newSpeed
-            play.car.newSpeed = 0
 
-        # Display PopUp
-        popUp.display()
-        l.append(popUp.rect.__copy__())
+          # ================= EVENTS =================
+          for event in pygame.event.get():
 
-        raceFinish = 1
+              if event.type == QUIT:
+                  misc.stopMusic()
+                  sys.exit(0)
 
-        currentTrack.track.lock()
-        # Display and manage finished game
-        for play in self.listPlayer:
+              elif event.type == KEYDOWN:
 
-          # Change the car sprite
-          if play.car.brake == 0:
-            play.car.image=play.car.cars[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
+                  if event.key == K_ESCAPE:
+                      paused = not paused
+                  
+                  # Pause menu controls
+                  if paused:
+                      if event.key == K_r:
+                          paused = False
+                          # CRITICAL: Force screen redraw when resuming
+                          # This clears the pause menu and shows the game immediately
+                          misc.screen.blit(currentTrack.track, (0, 0))
+                          pygame.display.flip()
+                      elif event.key == K_t:
+                          # Restart the race
+                          return self.play()
+                      elif event.key == K_q:
+                          # Quit to menu
+                          misc.stopMusic()
+                          return
+
+                  for play in self.listPlayer:
+                      if play.__class__.__name__ == "HumanPlayer":
+                          if event.key == play.keyAccel:
+                              play.keyAccelPressed = 1
+                          if event.key == play.keyBrake:
+                              play.keyBrakePressed = 1
+                          if event.key == play.keyLeft:
+                              play.keyLeftPressed = 1
+                          if event.key == play.keyRight:
+                              play.keyRightPressed = 1
+
+              elif event.type == KEYUP:
+                  for play in self.listPlayer:
+                      if play.__class__.__name__ == "HumanPlayer":
+                          if event.key == play.keyAccel:
+                              play.keyAccelPressed = 0
+                          if event.key == play.keyBrake:
+                              play.keyBrakePressed = 0
+                          if event.key == play.keyLeft:
+                              play.keyLeftPressed = 0
+                          if event.key == play.keyRight:
+                              play.keyRightPressed = 0
+
+          # Skip game updates if paused, but KEEP rendering
+          if paused:
+              # Don't update game logic
+              pass
           else:
-            play.car.image=play.car.cars2[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
+              # Make some modifications on the car commands
+              for play in self.listPlayer:
 
-          # If there's something on the car (the car is in a tunnel), manage mask to hide the car
-          part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
-          part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
-          partArray = pygame.surfarray.array2d(part)
-          aX = 0
-          for arrayX in partArray:
-            aY = 0
-            for col in arrayX:
-              if col % 256 != 0:
-                play.car.image.set_at((aX, aY), (255, 255, 255, 0))
-              aY = aY + 1
-            aX = aX + 1
+                if play.__class__.__name__ == "RobotPlayer":
+                  play.compute()
 
-          # Display tires slide
-          if play.car.slide == 1 or play.car.slide == 2:
-            coordN = (play.car.x - math.cos(play.car.angle)*play.car.height*0.4, play.car.y - math.sin(play.car.angle)*play.car.height*0.4)
-            coordS = (play.car.x + math.cos(play.car.angle)*play.car.height*0.4, play.car.y + math.sin(play.car.angle)*play.car.height*0.4)
-            coord0 = (int(coordN[0] - math.sin(play.car.angle)*play.car.width*0.3), int(coordN[1] + math.cos(play.car.angle)*play.car.width*0.3))
-            coord1 = (int(coordN[0] + math.sin(play.car.angle)*play.car.width*0.3), int(coordN[1] - math.cos(play.car.angle)*play.car.width*0.3))
-            coord2 = (int(coordS[0] - math.sin(play.car.angle)*play.car.width*0.3), int(coordS[1] + math.cos(play.car.angle)*play.car.width*0.3))
-            coord3 = (int(coordS[0] + math.sin(play.car.angle)*play.car.width*0.3), int(coordS[1] - math.cos(play.car.angle)*play.car.width*0.3))
-            oldCoordN = (play.car.ox - math.cos(play.car.oldAngle)*play.car.height*0.4, play.car.oy - math.sin(play.car.oldAngle)*play.car.height*0.4)
-            oldCoordS = (play.car.ox + math.cos(play.car.oldAngle)*play.car.height*0.4, play.car.oy + math.sin(play.car.oldAngle)*play.car.height*0.4)
-            oldCoord0 = (int(oldCoordN[0] - math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordN[1] + math.cos(play.car.oldAngle)*play.car.width*0.3))
-            oldCoord1 = (int(oldCoordN[0] + math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordN[1] - math.cos(play.car.oldAngle)*play.car.width*0.3))
-            oldCoord2 = (int(oldCoordS[0] - math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordS[1] + math.cos(play.car.oldAngle)*play.car.width*0.3))
-            oldCoord3 = (int(oldCoordS[0] + math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordS[1] - math.cos(play.car.oldAngle)*play.car.width*0.3))
+                if play.__class__.__name__ in ("HumanPlayer", "RobotPlayer"):
+                  if play.keyAccelPressed:
+                    play.car.doAccel()
+                  else:
+                    play.car.noAccel()
 
-            # Back tires
-            if currentTrack.trackF.get_at(coord2)[2] != 255 and currentTrack.trackF.get_at(oldCoord2)[2] != 255:
-              pygame.draw.line(currentTrack.track, (0,0,0), coord2, oldCoord2)
-            if currentTrack.trackF.get_at(coord3)[2] != 255 and currentTrack.trackF.get_at(oldCoord3)[2] != 255:
-              pygame.draw.line(currentTrack.track, (0,0,0), coord3, oldCoord3)
+                  if play.keyBrakePressed:
+                    play.car.doBrake()
+                  else:
+                    play.car.noBrake()
 
-            # Also Front tires if it's a braking slide
-            if play.car.slide == 2:
-              if currentTrack.trackF.get_at(coord0)[2] != 255 and currentTrack.trackF.get_at(oldCoord0)[2] != 255:
-                pygame.draw.line(currentTrack.track, (0,0,0), coord0, oldCoord0)
-              if currentTrack.trackF.get_at(coord1)[2] != 255 and currentTrack.trackF.get_at(oldCoord1)[2] != 255:
-                pygame.draw.line(currentTrack.track, (0,0,0), coord1, oldCoord1)
+                  if play.keyLeftPressed:
+                    play.car.doLeft()
+                  if play.keyRightPressed:
+                    play.car.doRight()
+                  if not play.keyLeftPressed and not play.keyRightPressed:
+                    play.car.noWheel()
+
+              # ✅ THIS BLOCK MUST BE SEPARATE (same indent as above for-loop)
+              for play in self.listPlayer:
+                  oldRect = play.car.rect
+                  l.append(oldRect.__copy__())
+                  # Only clear the old car position when NOT paused
+                  # When paused, we want to keep everything on screen
+                  if not paused:
+                      misc.screen.blit(currentTrack.track, play.car.rect, play.car.rect)
+
+              # For each player, update positions and check checkpoints
+              for play in self.listPlayer:
+                play.car.update()
+
+                play.chrono = play.chrono + 1
+
+                # Get infos on trackFunction
+                color=currentTrack.trackF.get_at((int(play.car.x), int(play.car.y)))
+                r=color[0]
+                #b=color[2]
+
+                # Manage the checkpoints to count the nb of laps
+                if currentTrack.reverse == 0 and play.raceFinish == 0:
+                  if r == play.lastCheckpoint + 16:
+                    play.lastCheckpoint = r
+                    #print "Checkpoint OK"
+                  # We finish a lap
+                  elif r == 16:
+                    # OK
+                    if play.lastCheckpoint == 16 * currentTrack.nbCheckpoint:
+                      play.lastCheckpoint = r
+                      play.nbLap = play.nbLap +1
+
+                      # Get the current rank (position)
+                      play.rank = bestRank[play.nbLap]
+                      bestRank[play.nbLap] = bestRank[play.nbLap] + 1
+
+                      # Get the best chrono   
+                      if play.chrono < play.bestChrono:
+                        play.bestChrono = play.chrono
+                        popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
+                      else:
+                        popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
+
+                      play.chrono = 0
+
+                    # NOK
+                    elif play.lastCheckpoint > 16:
+                      play.lastCheckpoint = r
+                      popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
+                      play.chrono = 0
+
+                elif currentTrack.reverse == 1 and play.raceFinish == 0:
+                  if r != 0 and r == play.lastCheckpoint - 16:
+                    play.lastCheckpoint = r
+                    #print "Checkpoint OK"
+                  # We finish a lap
+                  elif r == 16 * currentTrack.nbCheckpoint:
+                    # OK
+                    if play.lastCheckpoint == 16:
+                      play.lastCheckpoint = r
+                      play.nbLap = play.nbLap +1
+
+                      # Get the current rank (position)
+                      play.rank = bestRank[play.nbLap]
+                      bestRank[play.nbLap] = bestRank[play.nbLap] + 1
+
+                      # Get the best chrono   
+                      if play.chrono < play.bestChrono:
+                        play.bestChrono = play.chrono
+                        popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
+                      else:
+                        popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
+
+                      play.chrono = 0
+
+                    # NOK
+                    elif play.lastCheckpoint < 16 * currentTrack.nbCheckpoint:
+                      play.lastCheckpoint = r
+                      popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
+                      play.chrono = 0
+
+              # Manage Collisions
+              for play in self.listPlayer:
+                for play2 in self.listPlayer:
+                  if play == play2:
+                    continue
+                  playCollisionRects = []
+                  play2CollisionRects = []
+                  listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+                  if listIndex != []:
+                    playCollisionRects.append(0)
+                    for idx in listIndex:
+                      if idx not in play2CollisionRects:
+                        play2CollisionRects.append(idx)
+                  listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+                  if listIndex != []:
+                    playCollisionRects.append(1)
+                    for idx in listIndex:
+                      if idx not in play2CollisionRects:
+                        play2CollisionRects.append(idx)
+                  listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+                  if listIndex != []:
+                    playCollisionRects.append(2)
+                    for idx in listIndex:
+                      if idx not in play2CollisionRects:
+                        play2CollisionRects.append(idx)
+                  listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+                  if listIndex != []:
+                    playCollisionRects.append(3)
+                    for idx in listIndex:
+                      if idx not in play2CollisionRects:
+                        play2CollisionRects.append(idx)
+
+                  playCollisionRects.sort()
+                  play2CollisionRects.sort()
+                  #if playCollisionRects != []:
+                    #print playCollisionRects
+                  if playCollisionRects == [0]:
+                    play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
+                  elif playCollisionRects == [1]:
+                    play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
+                  elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
+                    play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
+                    play.car.newSpeed = 0
+                  elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
+                    play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
+                    play.car.newSpeed = 0
+                  elif playCollisionRects != [] :
+                    #TODO
+                    #print "Strange Collision !!!"
+                    #print playCollisionRects
+                    play.car.newSpeed = 0
+        
+              for play in self.listPlayer:
+                #print play.name
+                #print play.car.speedL
+                if play.car.newSpeed != 0:
+                  play.car.speed = play.car.newSpeed
+                  play.car.newSpeed = 0
+
+              # Display PopUp
+              popUp.display()
+              l.append(popUp.rect.__copy__())
+          
+
+          # ===== RADAR / MINIMAP (FINAL) =====
+
+          self.minimap.fill((30, 30, 30))
+
+          mini_track = pygame.transform.smoothscale(
+              currentTrack.track,
+              (MINIMAP_SIZE, MINIMAP_SIZE)
+          )
+          self.minimap.blit(mini_track, (0, 0))
+
+          scale_x = MINIMAP_SIZE / currentTrack.track.get_width()
+          scale_y = MINIMAP_SIZE / currentTrack.track.get_height()
+
+          for p in self.listPlayer:
+              dot_x = int(p.car.x * scale_x)
+              dot_y = int(p.car.y * scale_y)
+
+              if p == self.listPlayer[0]:
+                  color = (255, 0, 0)   # YOU
+              else:
+                  color = (0, 150, 255) # BOT
+
+              pygame.draw.circle(self.minimap, color, (dot_x, dot_y), 2)
+
+          pygame.draw.rect(
+              self.minimap,
+              (255, 255, 0),
+              (0, 0, MINIMAP_SIZE, MINIMAP_SIZE),
+              2
+          )
+
+          misc.screen.blit(self.minimap, MINIMAP_POS)
 
 
-          # Test if the player has finished
-          if play.nbLap == self.maxLapNb and play.raceFinish != 1:
-            play.raceFinish = 1
-            play.car.blink = 1
+          
+          # ===== CLEAN HUD (SMALL & PERFECT) =====
 
-          # Test is somebody has not finished
-          if play.nbLap != self.maxLapNb:
-            raceFinish = 0
+          player = self.listPlayer[0]
 
-          # Blink = 0, no blink
-          if play.car.blink == 0:
-            newRect = play.car.rect
-            l.append(newRect.__copy__())
-            play.car.sprite.draw(misc.screen)
+          hudFont = pygame.font.SysFont("Arial", 14, bold=True)
 
-          # Blink = 1, fast blink indicating the end of the race
-          if play.car.blink == 1 and play.car.blinkCount < 10:
-            play.car.blinkCount = play.car.blinkCount + 1
-            newRect = play.car.rect
-            l.append(newRect.__copy__())
+          def fmt(t):
+              if t <= 0 or t >= 999999:
+                  return "----"
+              return f"{t//100}:{t%100:02d}"
 
-            # Display the car
-            play.car.sprite.draw(misc.screen)
+          race_txt = hudFont.render("Race : " + fmt(masterChrono), True, (255,255,255))
+          lap_txt  = hudFont.render("Lap  : " + fmt(player.chrono), True, (255,255,255))
+          best_txt = hudFont.render("Best : " + fmt(player.bestChrono), True, (255,255,255))
 
-          elif play.car.blink == 1 and play.car.blinkCount >= 10:
-            play.car.blinkCount = play.car.blinkCount +1
+          padding = 6
+          line_gap = 18
 
-          if play.car.blink == 1 and play.car.blinkCount == 20:
-            play.car.blinkCount = 0
+          # ===== FIXED HUD SIZE (MATCH RADAR) =====
+          HUD_SIZE = MINIMAP_SIZE
 
-        currentTrack.track.unlock()
+          hud_bg = pygame.Surface((HUD_SIZE, HUD_SIZE))
+          hud_bg.set_alpha(220)
+          hud_bg.fill((0, 0, 0))
 
-        if i == 1:
-          # Compute the FPS
-          sec2 = datetime.datetime.now().second
-          if sec2 > sec or (sec == 59 and sec2 > 0):
-            fps = nbFrame
-            nbFrame = 1
-            sec = sec2
-            text = misc.popUpFont.render(str(fps), 1, misc.lightColor, (0, 0, 0))
-            textRect = text.get_rect()
-            textRect.x = 0
-            textRect.y = 0
-            misc.screen.blit(text, textRect)
-            l.append(textRect.__copy__())
+          HUD_X = 15
+          HUD_Y = 15
+
+          # Center text vertically
+          start_y = HUD_Y + 20
+          line_gap = 22
+
+          misc.screen.blit(hud_bg, (HUD_X, HUD_Y))
+          misc.screen.blit(race_txt, (HUD_X + 10, start_y))
+          misc.screen.blit(lap_txt,  (HUD_X + 10, start_y + line_gap))
+          misc.screen.blit(best_txt, (HUD_X + 10, start_y + 2 * line_gap))
+
+
+
+
+          currentTrack.track.lock()
+          # Display and manage finished game
+          for play in self.listPlayer:
+
+            # Change the car sprite
+            if play.car.brake == 0:
+              play.car.image=play.car.cars[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
+            else:
+              play.car.image=play.car.cars2[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
+
+            # If there's something on the car (the car is in a tunnel), manage mask to hide the car
+            part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
+            part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
+            partArray = pygame.surfarray.array2d(part)
+            aX = 0
+            for arrayX in partArray:
+              aY = 0
+              for col in arrayX:
+                if col % 256 != 0:
+                  play.car.image.set_at((aX, aY), (255, 255, 255, 0))
+                aY = aY + 1
+              aX = aX + 1
+
+            # Display tires slide
+            if play.car.slide == 1 or play.car.slide == 2:
+              coordN = (play.car.x - math.cos(play.car.angle)*play.car.height*0.4, play.car.y - math.sin(play.car.angle)*play.car.height*0.4)
+              coordS = (play.car.x + math.cos(play.car.angle)*play.car.height*0.4, play.car.y + math.sin(play.car.angle)*play.car.height*0.4)
+              coord0 = (int(coordN[0] - math.sin(play.car.angle)*play.car.width*0.3), int(coordN[1] + math.cos(play.car.angle)*play.car.width*0.3))
+              coord1 = (int(coordN[0] + math.sin(play.car.angle)*play.car.width*0.3), int(coordN[1] - math.cos(play.car.angle)*play.car.width*0.3))
+              coord2 = (int(coordS[0] - math.sin(play.car.angle)*play.car.width*0.3), int(coordS[1] + math.cos(play.car.angle)*play.car.width*0.3))
+              coord3 = (int(coordS[0] + math.sin(play.car.angle)*play.car.width*0.3), int(coordS[1] - math.cos(play.car.angle)*play.car.width*0.3))
+              oldCoordN = (play.car.ox - math.cos(play.car.oldAngle)*play.car.height*0.4, play.car.oy - math.sin(play.car.oldAngle)*play.car.height*0.4)
+              oldCoordS = (play.car.ox + math.cos(play.car.oldAngle)*play.car.height*0.4, play.car.oy + math.sin(play.car.oldAngle)*play.car.height*0.4)
+              oldCoord0 = (int(oldCoordN[0] - math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordN[1] + math.cos(play.car.oldAngle)*play.car.width*0.3))
+              oldCoord1 = (int(oldCoordN[0] + math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordN[1] - math.cos(play.car.oldAngle)*play.car.width*0.3))
+              oldCoord2 = (int(oldCoordS[0] - math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordS[1] + math.cos(play.car.oldAngle)*play.car.width*0.3))
+              oldCoord3 = (int(oldCoordS[0] + math.sin(play.car.oldAngle)*play.car.width*0.3), int(oldCoordS[1] - math.cos(play.car.oldAngle)*play.car.width*0.3))
+
+              # Back tires
+              if currentTrack.trackF.get_at(coord2)[2] != 255 and currentTrack.trackF.get_at(oldCoord2)[2] != 255:
+                pygame.draw.line(currentTrack.track, (0,0,0), coord2, oldCoord2)
+              if currentTrack.trackF.get_at(coord3)[2] != 255 and currentTrack.trackF.get_at(oldCoord3)[2] != 255:
+                pygame.draw.line(currentTrack.track, (0,0,0), coord3, oldCoord3)
+
+              # Also Front tires if it's a braking slide
+              if play.car.slide == 2:
+                if currentTrack.trackF.get_at(coord0)[2] != 255 and currentTrack.trackF.get_at(oldCoord0)[2] != 255:
+                  pygame.draw.line(currentTrack.track, (0,0,0), coord0, oldCoord0)
+                if currentTrack.trackF.get_at(coord1)[2] != 255 and currentTrack.trackF.get_at(oldCoord1)[2] != 255:
+                  pygame.draw.line(currentTrack.track, (0,0,0), coord1, oldCoord1)
+
+
+            # Test if the player has finished
+            if play.nbLap == self.maxLapNb and play.raceFinish != 1:
+              play.raceFinish = 1
+              play.car.blink = 1
+
+            # Blink = 0, no blink
+            if play.car.blink == 0:
+              newRect = play.car.rect
+              l.append(newRect.__copy__())
+              play.car.sprite.draw(misc.screen)
+
+            # Blink = 1, fast blink indicating the end of the race
+            if play.car.blink == 1 and play.car.blinkCount < 10:
+              # Only update blink count when NOT paused
+              if not paused:
+                play.car.blinkCount = play.car.blinkCount + 1
+              newRect = play.car.rect
+              l.append(newRect.__copy__())
+
+              # Display the car
+              play.car.sprite.draw(misc.screen)
+
+            elif play.car.blink == 1 and play.car.blinkCount >= 10:
+              # Only update blink count when NOT paused
+              if not paused:
+                play.car.blinkCount = play.car.blinkCount +1
+
+            if play.car.blink == 1 and play.car.blinkCount == 20:
+              play.car.blinkCount = 0
+
+          currentTrack.track.unlock()
+
+          # Check if ALL players have finished the race
+          if not paused:
+              raceFinish = 1  # Assume race is finished
+              for play in self.listPlayer:
+                  if play.nbLap != self.maxLapNb:
+                      raceFinish = 0  # Someone still racing
+                      break
+
+          if i == 1:
+            # Compute the FPS
+            sec2 = datetime.datetime.now().second
+            if sec2 > sec or (sec == 59 and sec2 > 0):
+              fps = nbFrame
+              nbFrame = 1
+              sec = sec2
+              text = misc.popUpFont.render(str(fps), 1, misc.lightColor, (0, 0, 0))
+              textRect = text.get_rect()
+              textRect.x = 0
+              textRect.y = 0
+              misc.screen.blit(text, textRect)
+              l.append(textRect.__copy__())
+            else:
+              nbFrame = nbFrame + 1
+
+            pygame.display.update(l)
+            i=0
+            l = []
           else:
-            nbFrame = nbFrame + 1
+            i=i+1
 
-          pygame.display.update(l)
-          i=0
-          l = []
-        else:
-          i=i+1
+          # ================= RENDER PAUSE MENU OVERLAY (UNREAL ENGINE STYLE) =================
+          if paused:
+              # Draw FULL TRACK to screen first (so background isn't black!)
+              misc.screen.blit(currentTrack.track, (0, 0))
+              
+              # Redraw all cars
+              for play in self.listPlayer:
+                  play.car.sprite.draw(misc.screen)
+              
+              # Redraw HUD
+              player = self.listPlayer[0]
+              hudFont = pygame.font.SysFont("Arial", 14, bold=True)
+              def fmt(t):
+                  if t <= 0 or t >= 999999:
+                      return "----"
+                  return f"{t//100}:{t%100:02d}"
+              race_txt = hudFont.render("Race : " + fmt(masterChrono), True, (255,255,255))
+              lap_txt  = hudFont.render("Lap  : " + fmt(player.chrono), True, (255,255,255))
+              best_txt = hudFont.render("Best : " + fmt(player.bestChrono), True, (255,255,255))
+              HUD_SIZE = MINIMAP_SIZE
+              hud_bg = pygame.Surface((HUD_SIZE, HUD_SIZE))
+              hud_bg.set_alpha(220)
+              hud_bg.fill((0, 0, 0))
+              HUD_X = 15
+              HUD_Y = 15
+              start_y = HUD_Y + 20
+              line_gap = 22
+              misc.screen.blit(hud_bg, (HUD_X, HUD_Y))
+              misc.screen.blit(race_txt, (HUD_X + 10, start_y))
+              misc.screen.blit(lap_txt,  (HUD_X + 10, start_y + line_gap))
+              misc.screen.blit(best_txt, (HUD_X + 10, start_y + 2 * line_gap))
+              
+              # Redraw minimap
+              misc.screen.blit(self.minimap, MINIMAP_POS)
+              
+              # NOW draw pause menu on top
+              # Menu dimensions (COMPACT SIZE)
+              box_width = 400
+              box_height = 350
+              cx = misc.screen.get_rect().centerx
+              cy = misc.screen.get_rect().centery
+              box_x = cx - box_width // 2
+              box_y = cy - box_height // 2
+              
+              # Draw semi-transparent overlay (so you can see the game!)
+              overlay = pygame.Surface(misc.screen.get_size())
+              overlay.set_alpha(100)
+              overlay.fill((0, 0, 0))
+              misc.screen.blit(overlay, (0, 0))
+              
+              # Create menu box with wooden/golden style
+              menu_box = pygame.Surface((box_width, box_height))
+              
+              # Gradient background (dark brown to lighter brown like wood)
+              for y in range(box_height):
+                  color_value = 30 + int((y / box_height) * 20)
+                  color = (color_value, color_value - 5, color_value - 10)
+                  pygame.draw.line(menu_box, color, (0, y), (box_width, y))
+              
+              # Wooden frame style - multiple borders
+              # Outer golden border
+              pygame.draw.rect(menu_box, (200, 150, 50), (0, 0, box_width, box_height), 8)
+              # Inner brown border
+              pygame.draw.rect(menu_box, (120, 80, 30), (8, 8, box_width-16, box_height-16), 3)
+              # Innermost highlight
+              pygame.draw.rect(menu_box, (80, 60, 20), (12, 12, box_width-24, box_height-24), 1)
+              
+              # Corner decorations (circles like in Unreal example)
+              corner_size = 20
+              corner_color = (180, 130, 40)
+              # Top-left
+              pygame.draw.circle(menu_box, corner_color, (15, 15), corner_size)
+              pygame.draw.circle(menu_box, (100, 70, 20), (15, 15), corner_size - 5)
+              # Top-right
+              pygame.draw.circle(menu_box, corner_color, (box_width - 15, 15), corner_size)
+              pygame.draw.circle(menu_box, (100, 70, 20), (box_width - 15, 15), corner_size - 5)
+              # Bottom-left
+              pygame.draw.circle(menu_box, corner_color, (15, box_height - 15), corner_size)
+              pygame.draw.circle(menu_box, (100, 70, 20), (15, box_height - 15), corner_size - 5)
+              # Bottom-right
+              pygame.draw.circle(menu_box, corner_color, (box_width - 15, box_height - 15), corner_size)
+              pygame.draw.circle(menu_box, (100, 70, 20), (box_width - 15, box_height - 15), corner_size - 5)
+              
+              # BIGGER Fonts for clarity
+              try:
+                  titleFont = pygame.font.SysFont("Arial", 56, bold=True)
+                  buttonFont = pygame.font.SysFont("Arial", 32, bold=True)
+              except:
+                  titleFont = pygame.font.Font(None, 56)
+                  buttonFont = pygame.font.Font(None, 32)
+              
+              # CLEAR title "PAUSED"
+              title_text = titleFont.render("PAUSED", True, (255, 220, 100))
+              title_shadow = titleFont.render("PAUSED", True, (60, 50, 30))
+              
+              # Position title (no rotation - keep it straight and clear)
+              title_rect = title_text.get_rect(center=(box_width // 2, 50))
+              shadow_rect = title_shadow.get_rect(center=(box_width // 2 + 2, 52))
+              
+              menu_box.blit(title_shadow, shadow_rect)
+              menu_box.blit(title_text, title_rect)
+              
+              # Decorative line under title
+              pygame.draw.line(menu_box, (150, 110, 40), (60, 85), (box_width - 60, 85), 2)
+              
+              # CLEAR, BIGGER BUTTONS
+              button_width = 320
+              button_height = 60
+              button_x = (box_width - button_width) // 2
+              
+              buttons = [
+                  {"text": "R - Resume", "y": 120, "color": (120, 255, 120)},
+                  {"text": "T - Restart", "y": 195, "color": (255, 220, 100)},
+                  {"text": "Q - Quit", "y": 270, "color": (255, 120, 120)}
+              ]
+              
+              for btn in buttons:
+                  # Button background with gradient
+                  btn_surface = pygame.Surface((button_width, button_height))
+                  for by in range(button_height):
+                      brightness = 60 + int((by / button_height) * 30)
+                      btn_color = (brightness, brightness - 10, brightness - 20)
+                      pygame.draw.line(btn_surface, btn_color, (0, by), (button_width, by))
+                  
+                  # Button border (golden)
+                  pygame.draw.rect(btn_surface, (200, 160, 80), (0, 0, button_width, button_height), 4)
+                  pygame.draw.rect(btn_surface, (120, 90, 40), (4, 4, button_width - 8, button_height - 8), 2)
+                  
+                  # BIGGER, CLEARER button text
+                  btn_text = buttonFont.render(btn["text"], True, btn["color"])
+                  btn_text_shadow = buttonFont.render(btn["text"], True, (30, 30, 30))
+                  
+                  text_rect = btn_text.get_rect(center=(button_width // 2, button_height // 2))
+                  shadow_rect = btn_text_shadow.get_rect(center=(button_width // 2 + 2, button_height // 2 + 2))
+                  
+                  btn_surface.blit(btn_text_shadow, shadow_rect)
+                  btn_surface.blit(btn_text, text_rect)
+                  
+                  # Blit button to menu box
+                  menu_box.blit(btn_surface, (button_x, btn["y"]))
+              
+              # Blit menu box to screen
+              misc.screen.blit(menu_box, (box_x, box_y))
+              
+              # Update display
+              pygame.display.flip()
 
-        masterChrono = masterChrono + 1
+          if not paused:
+            masterChrono = masterChrono + 1
 
-        # Record datas
-        for play in self.listPlayer:
-          replayArray.append(int(play.car.x/misc.zoom))
-          replayArray.append(int(play.car.y/misc.zoom))
-          replayArray.append(int(play.car.angle*1000))
+          # Record datas
+          for play in self.listPlayer:
+            replayArray.append(int(play.car.x/misc.zoom))
+            replayArray.append(int(play.car.y/misc.zoom))
+            replayArray.append(int(play.car.angle*1000))
 
-          # val = 100*car.blink + 10*car.brake + 1*car.slide
-          val = play.car.blink*100
-          if play.car.brake > 0:
-            val = val + 10
-          val = val + play.car.slide*1
-          replayArray.append(val)
-
-          # val = 1000*keyAccel + 100*keyBrake + 10*keyLeft + 1*keyRight
-          if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
-            val = play.keyAccelPressed*1000 + play.keyBrakePressed*100 + play.keyLeftPressed*10 + play.keyRightPressed*1
+            # val = 100*car.blink + 10*car.brake + 1*car.slide
+            val = play.car.blink*100
+            if play.car.brake > 0:
+              val = val + 10
+            val = val + play.car.slide*1
             replayArray.append(val)
-          else:
-            replayArray.append(0)
 
-        # Make sure game doesn't run at more than 100 frames per second
-        clock.tick(100)
+            # val = 1000*keyAccel + 100*keyBrake + 10*keyLeft + 1*keyRight
+            if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
+              val = play.keyAccelPressed*1000 + play.keyBrakePressed*100 + play.keyLeftPressed*10 + play.keyRightPressed*1
+              replayArray.append(val)
+            else:
+              replayArray.append(0)
+
+          # Make sure game doesn't run at more than 100 frames per second
+          clock.tick(100)
 
       # Display the last PopUp
       popUp.display()
