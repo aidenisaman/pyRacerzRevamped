@@ -19,8 +19,8 @@
 import pygame
 from pygame.locals import *
 
-from . import car
-from . import misc
+import car
+import misc
 
 import random
 import math
