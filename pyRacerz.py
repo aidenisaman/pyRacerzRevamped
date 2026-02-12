@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright (C) 2005  Jujucece <jujucece@gmail.com>
 #
@@ -25,13 +25,14 @@ import time
 import sys
 import os
 
-from modules import misc
-from modules import player
-from modules import game
-from modules import menu
-from modules import track
-from modules import replay
-from modules import challenge
+sys.path.append("modules")
+import modules.misc as misc
+import modules.player as player
+import modules.game as game
+import modules.menu as menu
+import modules.track as track
+import modules.replay as replay
+import modules.challenge as challenge
 
 def main():
 
@@ -62,11 +63,11 @@ def main():
       if sys.argv[i].upper() == "--NOSOUND":
         misc.music = 0
       if sys.argv[i].upper() == "--HELP" or sys.argv[i].upper() == "-H":
-        print("USAGE: pyRacerz.py [--resolution 640x480|320x240] [--fullscreen] [--doublebuf|--nodoublebuf] [--nosound] [--help|-h] [--version]")
+        print ("USAGE: pyRacerz.py [--resolution 640x480|320x240] [--fullscreen] [--doublebuf|--nodoublebuf] [--nosound] [--help|-h] [--version]")
         print()
         print("  --resolution   Change resolution (default is 1024x768)")
         print("  --fullscreen   Enable fullscreen display")
-        print("  --doublebuf    Enable double buffering display (DEFAULT on non-Windows)")
+        print("  --doublebuf    Enable double buffering display (DEFAULT on other platform than Windows)")
         print("  --nodoublebuf  Disable double buffering display (DEFAULT on Windows)")
         print("  --nosound      Disable Sound")
         print("  --help|-h      Display this help and exit")
@@ -103,20 +104,19 @@ def main():
     misc.screen = pygame.display.set_mode((int(1024*misc.zoom), int(768*misc.zoom)), displayFlags, 24)
 
   pygame.display.set_caption("pyRacerz v" + misc.VERSION)
-  
-  try:
-    pygame.display.set_icon(pygame.image.load(os.path.join("sprites", "pyRacerzIcon.bmp")))
-  except Exception as e:
-    print("Warning: Could not load icon:", e)
-  
-  if misc.music == 1:
-    try:
-      pygame.mixer.music.load(os.path.join("sounds", "start.ogg"))
-      pygame.mixer.music.play()
-    except Exception as e:
-      print("Warning: Could not play startup music:", e)
+  pygame.display.set_icon(pygame.image.load(os.path.join("sprites", "pyRacerzIcon.bmp")))
 
-  # psyco was a JIT compiler for Python 2.x - not needed anymore
+  if misc.music == 1:
+    pygame.mixer.music.load(os.path.join("sounds", "start.ogg"))
+    pygame.mixer.music.play()
+
+  #figure out what psyco was
+  try:
+    import psyco
+    psyco.full() 
+  except:
+    print ("Cannot use psyCo...")
+    pass
   
   pygame.mouse.set_visible(0)
 
@@ -135,7 +135,7 @@ def main():
       menu2 = menu.ChooseTrackMenu(misc.titleFont, "singleRace: chooseTrack", 2*misc.zoom, misc.itemFont)
       select2 = menu2.getInput()
       if select2 != -1:
-        race.listTrackName = [[select2[0], select2[1]]]
+        race.listTrackName = [[select2[0], select2[1]] ]
 
         menu3 = menu.ChooseValueMenu(misc.titleFont, "singleRace: chooseNbLaps", 0, misc.itemFont, 1, 10)
         select3 = menu3.getInput()
@@ -195,7 +195,7 @@ def main():
       for trackName in listAvailableTrackNames:
         tournament.listTrackName.append([trackName, 1])
 
-      menu2 = menu.ChooseValueMenu(misc.titleFont, "tournament: chooseNbLaps", 0, misc.itemFont, 1, 10)
+      menu2 = menu.ChooseValueMenu(misc.titleFont, "tournament: chooseNbLaps", 0, misc.itemFont,1 ,10)
       select2 = menu2.getInput()
       if select2 != -1:
         tournament.maxLapNb = select2
@@ -233,11 +233,12 @@ def main():
                   break
                 tournament.listPlayer.append(thePlayer)
 
-              # If there's no exit during enter of player
-              if isExit == 0:
-                tournament.play()
+           
+          # If there's no exit during enter of player
+          if isExit == 0:
+            tournament.play()
 
-    # Challenge
+    # Evolution
     elif select1 == 3:
       tournament = game.Game("challenge")
 
@@ -246,17 +247,13 @@ def main():
       if thePlayer != -1:
         challenge.Challenge(thePlayer)
 
-    # Replays
     elif select1 == 4:
       replays = []
 
-      try:
-        listFiles = os.listdir("replays")
-        for fileReplay in listFiles:
-          if fileReplay.endswith(".rep"):
-            replays.append(fileReplay.replace(".rep", ""))
-      except Exception as e:
-        print("Warning: Could not read replays directory:", e)
+      listFiles = os.listdir("replays")
+      for fileReplay in listFiles:
+        if fileReplay.endswith(".rep"):
+          replays.append(fileReplay.replace(".rep", ""))
 
       menu7 = menu.SimpleMenu(misc.titleFont, "replay: chooseFile", 1*misc.zoom, misc.smallItemFont, replays)
       select7 = menu7.getInput()
@@ -265,21 +262,16 @@ def main():
         rep = replay.Replay(os.path.join("replays", replays[select7-1] + ".rep"))
         rep.play()
 
-    # Hi Scores
     elif select1 == 5:
       hiscoresMenu = menu.MenuHiscores(misc.titleFont, "hiscores", 10*misc.zoom, misc.smallItemFont)
       hiscoresMenu.getInput()
-    
-    # Credits
     elif select1 == 6:
       creditsMenu = menu.MenuCredits(misc.titleFont, "credits", 10*misc.zoom, misc.itemFont)
       misc.wait4Key()
-    
-    # License
     elif select1 == 7:
       licenseMenu = menu.MenuLicense(misc.titleFont, "license", 10*misc.zoom, misc.smallItemFont)
       misc.wait4Key()
 
-# Standard Python entry point
-if __name__ == '__main__':
-  main()
+#import profile
+#profile.run('main()')
+if __name__ == '__main__': main()
