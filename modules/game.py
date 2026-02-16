@@ -182,10 +182,9 @@ class Game:
 
       # Event loop
       while raceFinish == 0:
-        # ...event handling and game logic...
+        #event handling and game logic
         l = []  # Clear dirty rects at the start of each frame
         misc.screen.blit(currentTrack.track, (0, 0))
-        # --- Add this right after drawing the track ---
         # Only show the next checkpoint for each player
         if currentTrack.name == "desert":
           checkpoint_values = list(range(16, 16 * (currentTrack.nbCheckpoint + 1), 16))
@@ -195,7 +194,6 @@ class Game:
               idx = checkpoint_values.index(next_checkpoint_value)
               pos = checkpoint_centers[idx]
               pygame.draw.circle(misc.screen, (255, 0, 0), pos, 10)
-              # Do not append rect to l; the track redraw will erase old circles
 
         #Get the event Keys
         for event in pygame.event.get():
