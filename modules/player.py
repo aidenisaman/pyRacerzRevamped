@@ -196,11 +196,11 @@ class RobotPlayer(Player):
       
       self.keyAccelPressed = 1
       self.keyBrakePressed = 0
-      if minDistIndex == [0] or minDistIndex == [1] or minDistIndex == [2]:
+      if minDistIndex == 0 or minDistIndex == 1 or minDistIndex == 2:
         self.keyLeftPressed = 1
       else:
         self.keyLeftPressed = 0
-      if minDistIndex == [4] or minDistIndex == [5] or minDistIndex == [6]:
+      if minDistIndex == 4 or minDistIndex == 5 or minDistIndex == 6:
         self.keyRightPressed = 1
       else:
         self.keyRightPressed = 0      
