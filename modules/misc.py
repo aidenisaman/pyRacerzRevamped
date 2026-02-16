@@ -16,6 +16,7 @@
 # along with pyRacerz; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+from hashlib import sha1
 import pygame
 from pygame.locals import *
 
@@ -23,7 +24,7 @@ import random
 import os
 import sys
 import configparser
-import hashlib
+#import sha
 
 VERSION = "0.2"
 
@@ -38,11 +39,10 @@ titleFont = None
 itemFont = None
 smallItemFont = None
 bigFont = None
-hudFont = None  # Added for HUD display
 
 music = 1
 
-zoom = 1.0  # Float for proper scaling
+zoom = 1
 
 def init():
   global popUpFont
@@ -50,14 +50,12 @@ def init():
   global itemFont
   global smallItemFont
   global bigFont
-  global hudFont
   global background
 
   try:
     popUpFont = pygame.font.Font(os.path.join("fonts", "arcade_pizzadude", "ARCADE.TTF"), int(24*zoom))
     titleFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(52*zoom))
     itemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(34*zoom))
-    hudFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(26*zoom))  # ✅ HUD font
     smallItemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(30*zoom))
     bigFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(66*zoom))
   except Exception as e:
@@ -68,12 +66,7 @@ def init():
   background = pygame.transform.scale(pygame.image.load(os.path.join("sprites", "background.png")).convert(), (int(1024*zoom), int(768*zoom)))
 
 def chrono2Str(chrono):
-  """Convert chrono ticks to readable time format MM:SS"""
-  if chrono <= 0 or chrono >= 999999:
-    return "----"
-  seconds = chrono // 100
-  centiseconds = chrono % 100
-  return f"{seconds}:{centiseconds:02d}"
+  return str(chrono/100.0).replace(".", "''")
 
 def wait4Key():
   # Clear event queue
@@ -111,7 +104,7 @@ def startRandomMusic():
         pygame.mixer.music.load(os.path.join("musics", musics[rand]))
         pygame.mixer.music.play()
       except Exception as e:
-        print("Music: %s unable to play..." % musics[rand])
+        print("Music: %s unable to play..." % musics[rand]) 
         print(e)
 
 def stopMusic():
@@ -121,7 +114,7 @@ class PopUp:
   def __init__(self, track):
     self.track = track
     self.listElement = []
-    self.rect = pygame.Rect(int(0), int(688*zoom), int(260*zoom), int(80*zoom))
+    self.rect = pygame.Rect(0, 688*zoom, 260*zoom, 80*zoom)
 
   def addElement(self, car, text):
     self.listElement.append([car, text, 0])
@@ -134,7 +127,7 @@ class PopUp:
     #If useful, display PopUp Area
     if self.listElement != []:
 
-      y = int(750*zoom)
+      y = 750*zoom
 
       for elem in self.listElement:
         x = 0
@@ -160,24 +153,21 @@ class PopUp:
         y = y - textRect.height
 
 def addHiScore(track, player):
-  """Add or update high score for a track/level combination"""
 
   fileExist = 1
 
-  confFile = configparser.ConfigParser()
+  confFile=configparser.ConfigParser() 
   try:
-    with open(".pyRacerz.conf", "r") as f:
-      confFile.read_file(f)
+    confFile.read_file(open(".pyRacerz.conf", "r")) 
   except Exception:
     fileExist = 0
   
   # If the track is not represented, create it
   if fileExist == 0 or not confFile.has_section("hi " + track.name):
-    with open(".pyRacerz.conf", "w+") as fwrite:
-      confFile.add_section("hi " + track.name)
-      confFile.write(fwrite)
-    with open(".pyRacerz.conf", "r") as f:
-      confFile.read_file(f)
+    fwrite = open(".pyRacerz.conf", "w+")
+    confFile.add_section("hi " + track.name)
+    confFile.write(fwrite)
+    confFile.read_file(open(".pyRacerz.conf", "r")) 
 
   # For the Inverse
   if track.reverse == 0:
@@ -185,64 +175,50 @@ def addHiScore(track, player):
   else:
     level = -player.level
 
-  # Proper hashlib usage for Python 3
   # If the Level is not represented create it and put the Hi-scores
   if not confFile.has_option("hi " + track.name, "level" + str(level)):
-    h = hashlib.sha1()
-    h.update(str(track.name).encode("utf-8"))
-    h.update(str("level" + str(level)).encode("utf-8"))
-    h.update(player.name.encode("utf-8"))
-    h.update(str(player.bestChrono).encode("utf-8"))
-    
-    with open(".pyRacerz.conf", "w+") as fwrite:
-      confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
-      confFile.write(fwrite)
+    h = sha1.new(str(track.name))
+    h.update(str("level" + str(level)))
+    h.update(player.name)
+    h.update(str(player.bestChrono))
+    fwrite = open(".pyRacerz.conf", "w+")
+    confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
+    confFile.write(fwrite)
     return 1
   else:
     hi = confFile.get("hi " + track.name, "level" + str(level)).split()
-    
-    # Verify existing hash
-    h = hashlib.sha1()
-    h.update(str(track.name).encode("utf-8"))
-    h.update(str("level" + str(level)).encode("utf-8"))
-    h.update(hi[0].encode("utf-8"))
-    h.update(hi[1].encode("utf-8"))
-    
+    h = sha1.new(str(track.name))
+    h.update(str("level" + str(level)))
+    h.update(hi[0])
+    h.update(hi[1])
     if hi[2] == h.hexdigest():
       if int(hi[1]) > player.bestChrono:
-        # New high score!
-        h = hashlib.sha1()
-        h.update(str(track.name).encode("utf-8"))
-        h.update(str("level" + str(level)).encode("utf-8"))
-        h.update(player.name.encode("utf-8"))
-        h.update(str(player.bestChrono).encode("utf-8"))
-        
-        with open(".pyRacerz.conf", "w+") as fwrite:
-          confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
-          confFile.write(fwrite)
+        h = sha1.new(str(track.name))
+        h.update(str("level" + str(level)))
+        h.update(player.name)
+        h.update(str(player.bestChrono))
+        fwrite = open(".pyRacerz.conf", "w+")
+        confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
+        confFile.write(fwrite)
         return 1
       else:
         return 0
     else:
-      # If the HiScore is Corrupted, replace it
-      h = hashlib.sha1()
-      h.update(str(track.name).encode("utf-8"))
-      h.update(str("level" + str(level)).encode("utf-8"))
-      h.update(player.name.encode("utf-8"))
-      h.update(str(player.bestChrono).encode("utf-8"))
-      
-      with open(".pyRacerz.conf", "w+") as fwrite:
-        confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
-        confFile.write(fwrite)
+      # If the HiScore is Corrupted, erase it
+      h = sha1.new(str(track.name))
+      h.update(str("level" + str(level)))
+      h.update(player.name)
+      h.update(str(player.bestChrono))
+      fwrite = open(".pyRacerz.conf", "w+")
+      confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
+      confFile.write(fwrite)
       return 1
 
 def getUnlockLevel():
-  """Get the current unlock level from config"""
 
-  confFile = configparser.ConfigParser()
+  confFile=configparser.ConfigParser() 
   try:
-    with open(".pyRacerz.conf", "r") as f:
-      confFile.read_file(f)
+    confFile.readfp(open(".pyRacerz.conf", "r")) 
   except Exception:
     return 0
 
@@ -252,19 +228,14 @@ def getUnlockLevel():
     return 0
 
   key = confFile.get("unlockLevel", "key").split()
-  
-  # Proper hashlib usage for Python 3
-  h = hashlib.sha1()
-  h.update(b"pyRacerz")
-  h.update(str(key[0]).encode("utf-8"))
-  
+  h = sha1.new("pyRacerz")
+  h.update(str(key[0]))
   if h.hexdigest() == key[1]:
-    return int(key[0])
+    return key[0]
   else:
     return 0
 
 def setUnlockLevel(lck):
-  """Set the unlock level in config"""
 
   # Only change the unlock level if it's better than the actual one
   if getUnlockLevel() >= lck:
@@ -272,25 +243,21 @@ def setUnlockLevel(lck):
 
   fileExist = 1
 
-  confFile = configparser.ConfigParser()
+  confFile=configparser.ConfigParser() 
   try:
-    with open(".pyRacerz.conf", "r") as f:
-      confFile.read_file(f)
+    confFile.read_file(open(".pyRacerz.conf", "r")) 
   except Exception:
     fileExist = 0
 
   if fileExist == 0 or not confFile.has_section("unlockLevel"):
-    with open(".pyRacerz.conf", "w+") as fwrite:
-      confFile.add_section("unlockLevel")
-      confFile.write(fwrite)
-    with open(".pyRacerz.conf", "r") as f:
-      confFile.read_file(f)
-
-  # Proper hashlib usage for Python 3
-  h = hashlib.sha1()
-  h.update(b"pyRacerz")
-  h.update(str(lck).encode("utf-8"))
-  
-  with open(".pyRacerz.conf", "w+") as fwrite:
-    confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())
+    fwrite = open(".pyRacerz.conf", "w+")
+    confFile.add_section("unlockLevel")
     confFile.write(fwrite)
+    confFile.read_file(open(".pyRacerz.conf", "r"))
+
+  h = sha1.new("pyRacerz")
+  h.update(str(lck))
+  fwrite = open(".pyRacerz.conf", "w+")
+  confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())
+  confFile.write(fwrite)
+  fwrite.close()
