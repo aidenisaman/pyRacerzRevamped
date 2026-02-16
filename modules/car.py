@@ -32,9 +32,12 @@ class Car(pygame.sprite.Sprite):
     image = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + ".png")).convert_alpha()
     imageLight = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + "B.png")).convert_alpha()
     
+    # Car size scaling
+    self.scale = 1.5   # car size control (ONLY CAR)
+    
     self.sprite = pygame.sprite.RenderPlain(self)
 
-    self.miniCar = pygame.transform.rotozoom(image, 0, misc.zoom)
+    self.miniCar = pygame.transform.rotozoom(image, 0, misc.zoom * self.scale)
 
     self.color = color
 
@@ -55,11 +58,10 @@ class Car(pygame.sprite.Sprite):
     self.maxSpeedB = -0.66*self.level
     self.power = 0.0133*self.level
 
-    self.sizeRect = int(30*misc.zoom)
-
-    # TODO do not put it hardcoded...
-    self.width = int(15*misc.zoom)
-    self.height = int(24*misc.zoom)
+    # Scaled dimensions
+    self.sizeRect = int(30 * misc.zoom * self.scale)
+    self.width    = int(15 * misc.zoom * self.scale)
+    self.height   = int(24 * misc.zoom * self.scale)
 
     self.cars = []
     self.cars2 = []
@@ -73,8 +75,9 @@ class Car(pygame.sprite.Sprite):
       carRot2=pygame.Surface((self.sizeRect,self.sizeRect), SRCALPHA|HWSURFACE, 16).convert_alpha()
       carRotLight2=pygame.Surface((self.sizeRect,self.sizeRect), SRCALPHA|HWSURFACE, 16).convert_alpha()
 
-      carRotRaw=pygame.transform.rotozoom(image, -j*360.0/256.0, misc.zoom)
-      carRotLightRaw=pygame.transform.rotozoom(imageLight, -j*360.0/256.0, misc.zoom)
+      # Scaled rotation
+      carRotRaw=pygame.transform.rotozoom(image, -j*360.0/256.0, misc.zoom * self.scale)
+      carRotLightRaw=pygame.transform.rotozoom(imageLight, -j*360.0/256.0, misc.zoom * self.scale)
 
       carRot.blit(carRotRaw, ((self.sizeRect-carRotRaw.get_width())/2, (self.sizeRect-carRotRaw.get_height())/2) )
       carRotLight.blit(carRotLightRaw, ((self.sizeRect-carRotLightRaw.get_width())/2, (self.sizeRect-carRotLightRaw.get_height())/2) )
@@ -455,5 +458,4 @@ class Car(pygame.sprite.Sprite):
       self.angleW = 1
 
   def noWheel(self):
-    self.angleW = 0.0 
-
+    self.angleW = 0.0
