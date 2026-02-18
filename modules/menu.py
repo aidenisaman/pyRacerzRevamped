@@ -32,6 +32,30 @@ from . import player
 from . import track
 from . import misc
 
+
+def _menu_loop(refresh_cb, handle_keydown):
+  """Shared event loop for menu screens.
+
+  refresh_cb: callable that redraws the menu state.
+  handle_keydown: callable taking a pygame key code, returning either:
+    - "refresh" to trigger a redraw and continue the loop
+    - any other non-None value to return that value and exit the loop
+  """
+
+  refresh_cb()
+
+  while 1:
+    for event in pygame.event.get():
+      if event.type == QUIT:
+        sys.exit(0)
+      elif event.type == KEYDOWN:
+        result = handle_keydown(event.key)
+        if result == "refresh":
+          refresh_cb()
+        elif result is not None:
+          return result
+    pygame.time.delay(10)
+
 class Menu:
   '''Base class for any pyRacerz Menu'''
 
@@ -62,33 +86,26 @@ class SimpleMenu(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return -1
+      if key == K_UP:
+        if self.select != 1:
+          self.select = self.select - 1
+        else:
+          self.select = len(self.listItem)
+        return "refresh"
+      if key == K_DOWN:
+        if self.select != len(self.listItem):
+          self.select = self.select + 1
+        else:
+          self.select = 1
+        return "refresh"
+      if key == K_RETURN:
+        return self.select
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return -1
-          if event.key == K_UP:
-            if self.select != 1:
-              self.select = self.select - 1
-            else:
-              self.select = len(self.listItem)
-            self.refresh()
-          if event.key == K_DOWN:
-            if self.select != len(self.listItem):
-              self.select = self.select + 1
-            else:
-              self.select = 1
-            self.refresh()
-          if event.key == K_RETURN:
-            return self.select
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
 
@@ -182,45 +199,29 @@ class ChooseTrackMenu(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return -1
+      if key == K_UP:
+        if self.select != 1:
+          self.select = self.select - 1
+        else:
+          self.select = len(self.listIconTracks)
+        return "refresh"
+      if key == K_DOWN:
+        if self.select != len(self.listIconTracks):
+          self.select = self.select + 1
+        else:
+          self.select = 1
+        return "refresh"
+      if key == K_LEFT or key == K_RIGHT:
+        self.reverse = 1 - self.reverse
+        return "refresh"
+      if key == K_RETURN:
+        return [self.listAvailableTrackNames[self.select-1], self.reverse]
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return -1
-          if event.key == K_UP:
-            if self.select != 1:
-              self.select = self.select - 1
-            else:
-              self.select = len(self.listIconTracks)
-            self.refresh()
-          if event.key == K_DOWN:
-            if self.select != len(self.listIconTracks):
-              self.select = self.select + 1
-            else:
-              self.select = 1
-            self.refresh()
-          if event.key == K_LEFT:
-            if self.reverse == 0:
-              self.reverse = 1
-            else:
-              self.reverse = 0
-            self.refresh()
-          if event.key == K_RIGHT:
-            if self.reverse == 0:
-              self.reverse = 1
-            else:
-              self.reverse = 0
-            self.refresh()
-          if event.key == K_RETURN:
-            return [self.listAvailableTrackNames[self.select-1], self.reverse]
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
 
@@ -276,33 +277,26 @@ class ChooseValueMenu(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return -1
+      if key == K_UP:
+        if self.select != self.vMin:
+          self.select = self.select - 1
+        else:
+          self.select = self.vMax
+        return "refresh"
+      if key == K_DOWN:
+        if self.select != self.vMax:
+          self.select = self.select + 1
+        else:
+          self.select = self.vMin
+        return "refresh"
+      if key == K_RETURN:
+        return self.select
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return -1
-          if event.key == K_UP:
-            if self.select != self.vMin:
-              self.select = self.select - 1
-            else:
-              self.select = self.vMax
-            self.refresh()
-          if event.key == K_DOWN:
-            if self.select != self.vMax:
-              self.select = self.select + 1
-            else:
-              self.select = self.vMin
-            self.refresh()
-          if event.key == K_RETURN:
-            return self.select
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
 
@@ -349,30 +343,22 @@ class ChooseTextMenu(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return None
+      if key >= K_a and key <= K_z:
+        if len(self.text) < self.maxLenght:
+          self.text = self.text + pygame.key.name(key).upper()
+        return "refresh"
+      if key == K_BACKSPACE:
+        if len(self.text) > 0:
+          self.text = self.text[:-1]
+        return "refresh"
+      if key == K_RETURN:
+        return self.text
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return None
-          if event.key >= K_a and event.key <= K_z:
-            if len(self.text) < self.maxLenght:
-              self.text = self.text + pygame.key.name(event.key).upper()
-            self.refresh()
-          if event.key == K_BACKSPACE:
-            if len(self.text) > 0:
-              # There's surely a simpler way to erase the last Char !!!
-              self.text = string.rstrip(self.text, self.text[len(self.text)-1])
-              self.refresh()
-          if event.key == K_RETURN:
-            return self.text
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
 
@@ -445,111 +431,88 @@ class ChooseHumanPlayerMenu(Menu):
     self.keyRight = K_RIGHT
 
   def getInput(self):
-  
-    self.refresh()
 
-    while 1:
+    awaiting_key = [None]
 
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return -1
-          if event.key == K_UP:
-            if self.select != 1:
-              self.select = self.select - 1
-            else:
-              self.select = 8
-            self.refresh()
-          if event.key == K_DOWN:
-            if self.select != 8:
-              self.select = self.select + 1
-            else:
-              self.select = 1
-            self.refresh()
-          if event.key == K_LEFT:
-            if self.select == 1:
-              if self.carColor != 1:
-                self.carColor = self.carColor - 1
-              else:
-                self.carColor = len(self.listCars)
+    def handle_key(key):
+      if awaiting_key[0] != None:
+        if awaiting_key[0] == "accel":
+          self.keyAccel = key
+        elif awaiting_key[0] == "brake":
+          self.keyBrake = key
+        elif awaiting_key[0] == "left":
+          self.keyLeft = key
+        elif awaiting_key[0] == "right":
+          self.keyRight = key
+        awaiting_key[0] = None
+        return "refresh"
 
-            if self.select == 3:
-              if self.level != 1:
-                self.level = self.level - 1
-              else:
-                self.level = 3
-            self.refresh()
-          if event.key == K_RIGHT:
-            if self.select == 1:
-              if self.carColor != len(self.listCars):
-                self.carColor = self.carColor + 1
-              else:
-                self.carColor = 1
+      if key == K_ESCAPE:
+        return -1
+      if key == K_UP:
+        if self.select != 1:
+          self.select = self.select - 1
+        else:
+          self.select = 8
+        return "refresh"
+      if key == K_DOWN:
+        if self.select != 8:
+          self.select = self.select + 1
+        else:
+          self.select = 1
+        return "refresh"
+      if key == K_LEFT:
+        if self.select == 1:
+          if self.carColor != 1:
+            self.carColor = self.carColor - 1
+          else:
+            self.carColor = len(self.listCars)
+        if self.select == 3:
+          if self.level != 1:
+            self.level = self.level - 1
+          else:
+            self.level = 3
+        return "refresh"
+      if key == K_RIGHT:
+        if self.select == 1:
+          if self.carColor != len(self.listCars):
+            self.carColor = self.carColor + 1
+          else:
+            self.carColor = 1
+        if self.select == 3:
+          if self.level != 3:
+            self.level = self.level + 1
+          else:
+            self.level = 1
+        return "refresh"
+      if key == K_RETURN:
+        if self.select == 4:
+          self.keyAccel = None
+          awaiting_key[0] = "accel"
+          return "refresh"
+        if self.select == 5:
+          self.keyBrake = None
+          awaiting_key[0] = "brake"
+          return "refresh"
+        if self.select == 6:
+          self.keyLeft = None
+          awaiting_key[0] = "left"
+          return "refresh"
+        if self.select == 7:
+          self.keyRight = None
+          awaiting_key[0] = "right"
+          return "refresh"
+        if self.select == 8:
+          return player.HumanPlayer(self.pseudo, int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level, self.keyAccel, self.keyBrake, self.keyLeft, self.keyRight)
+      if key >= K_a and key <= K_z and self.select == 2:
+        if len(self.pseudo) >= 3:
+          self.pseudo = pygame.key.name(key).upper()
+        else:
+          self.pseudo = self.pseudo + pygame.key.name(key).upper()
+        return "refresh"
+      return None
 
-            if self.select == 3:
-              if self.level != 3:
-                self.level = self.level + 1
-              else:
-                self.level = 1
-            self.refresh()
-
-          # Key Enter used for Command Keys Enter
-          if event.key == K_RETURN:
-            if self.select == 4:
-              self.keyAccel = None
-              self.refresh()
-              key = 0
-              while key == 0:
-                for event2 in pygame.event.get():
-                  if event2.type == KEYDOWN:
-                    self.keyAccel = event2.key
-                    key = 1
-            if self.select == 5:
-              self.keyBrake = None
-              self.refresh()
-              key = 0
-              while key == 0:
-                for event2 in pygame.event.get():
-                  if event2.type == KEYDOWN:
-                    self.keyBrake = event2.key
-                    key = 1
-            if self.select == 6:
-              self.keyLeft = None
-              self.refresh()
-              key = 0
-              while key == 0:
-                for event2 in pygame.event.get():
-                  if event2.type == KEYDOWN:
-                    self.keyLeft = event2.key
-                    key = 1
-            if self.select == 7:
-              self.keyRight = None
-              self.refresh()
-              key = 0
-              while key == 0:
-                for event2 in pygame.event.get():
-                  if event2.type == KEYDOWN:
-                    self.keyRight = event2.key
-                    key = 1
-            self.refresh()
-
-          # Enter the Pseudo
-          if event.key >= K_a and event.key <= K_z  and self.select == 2:
-            if len(self.pseudo) >= 3:
-              self.pseudo = pygame.key.name(event.key).upper()
-            else:
-              self.pseudo = self.pseudo + pygame.key.name(event.key).upper()
-            self.refresh()
-
-          if event.key == K_RETURN and self.select == 8:
-            # Careful to get the real carColor number and not the fake one (caused by the listdir)
-            return player.HumanPlayer(self.pseudo, int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level, self.keyAccel, self.keyBrake, self.keyLeft, self.keyRight)
-
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
 
   def refresh(self):
@@ -739,62 +702,50 @@ class ChooseRobotPlayerMenu(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return -1
+      if key == K_UP:
+        if self.select != 1:
+          self.select = self.select - 1
+        else:
+          self.select = 3
+        return "refresh"
+      if key == K_DOWN:
+        if self.select != 3:
+          self.select = self.select + 1
+        else:
+          self.select = 1
+        return "refresh"
+      if key == K_LEFT:
+        if self.select == 1:
+          if self.carColor != 1:
+            self.carColor = self.carColor - 1
+          else:
+            self.carColor = len(self.listCars)
+        if self.select == 2:
+          if self.level != 1:
+            self.level = self.level - 1
+          else:
+            self.level = 3
+        return "refresh"
+      if key == K_RIGHT:
+        if self.select == 1:
+          if self.carColor != len(self.listCars):
+            self.carColor = self.carColor + 1
+          else:
+            self.carColor = 1
+        if self.select == 2:
+          if self.level != 3:
+            self.level = self.level + 1
+          else:
+            self.level = 1
+        return "refresh"
+      if key == K_RETURN and self.select == 3:
+        return player.RobotPlayer(int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level)
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_ESCAPE:
-            return -1
-          if event.key == K_UP:
-            if self.select != 1:
-              self.select = self.select - 1
-            else:
-              self.select = 3
-            self.refresh()
-          if event.key == K_DOWN:
-            if self.select != 3:
-              self.select = self.select + 1
-            else:
-              self.select = 1
-            self.refresh()
-          if event.key == K_LEFT:
-            if self.select == 1:
-              if self.carColor != 1:
-                self.carColor = self.carColor - 1
-              else:
-                self.carColor = len(self.listCars)
-
-            if self.select == 2:
-              if self.level != 1:
-                self.level = self.level - 1
-              else:
-                self.level = 3
-            self.refresh()
-          if event.key == K_RIGHT:
-            if self.select == 1:
-              if self.carColor != len(self.listCars):
-                self.carColor = self.carColor + 1
-              else:
-                self.carColor = 1
-
-            if self.select == 2:
-              if self.level != 3:
-                self.level = self.level + 1
-              else:
-                self.level = 1
-            self.refresh()
-
-          if event.key == K_RETURN and self.select == 3:
-            # Careful to get the real carColor number and not the fake one (caused by the listdir)
-            return player.RobotPlayer(int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level)
-
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
 
   def refresh(self):
@@ -1088,29 +1039,22 @@ class MenuHiscores(Menu):
 
   def getInput(self):
   
-    self.refresh()
+    def handle_key(key):
+      if key == K_UP:
+        if self.nbItem > 5:
+          if self.startItem != 0:
+            self.startItem = self.startItem - 1
+            return "refresh"
+      elif key == K_DOWN:
+        if self.nbItem > 5:
+          if self.startItem != self.nbItem - 4:
+            self.startItem = self.startItem + 1
+            return "refresh"
+      else:
+        return 0
+      return None
 
-    while 1:
-
-      # Get the event keys
-      for event in pygame.event.get():
-    
-        if event.type == QUIT:
-          sys.exit(0)
-        elif event.type == KEYDOWN:
-          if event.key == K_UP:
-            if self.nbItem > 5 :
-              if self.startItem != 0:
-                self.startItem = self.startItem - 1
-                self.refresh()
-          elif event.key == K_DOWN:
-            if self.nbItem > 5 :
-              if self.startItem != self.nbItem - 4:
-                self.startItem = self.startItem + 1
-                self.refresh()
-          else:
-            return
-      pygame.time.delay(10)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
 
