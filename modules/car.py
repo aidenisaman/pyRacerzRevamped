@@ -344,6 +344,7 @@ class Car(pygame.sprite.Sprite):
 
     # DRIFT MECHANIC 
     if self.drifting:
+      DRIFT_LATERAL_AMPLIFY = 2.2
       lateralMultiplier = 1.0 + (DRIFT_LATERAL_AMPLIFY - 1.0) * self.driftIntensity
       self.accelL = self.accelL * lateralMultiplier
 
