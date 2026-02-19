@@ -33,6 +33,23 @@ from . import track
 from . import misc
 
 
+def _screen_rect():
+  return misc.screen.get_rect()
+
+
+def _clear_row(y, height):
+  rect = pygame.Rect(0, y, _screen_rect().width, height)
+  misc.screen.blit(misc.background, rect, rect)
+
+
+def _blit_center(surf, y):
+  rect = surf.get_rect()
+  rect.centerx = _screen_rect().centerx
+  rect.y = y
+  misc.screen.blit(surf, rect)
+  return rect
+
+
 def _menu_loop(refresh_cb, handle_keydown):
   """Shared event loop for menu screens.
 
@@ -120,10 +137,9 @@ class SimpleMenu(Menu):
       else:
         text = self.itemFont.render(item, 1, misc.darkColor)
       textRect = text.get_rect()
-      textRect.centerx = misc.screen.get_rect().centerx
+      textRect.centerx = _screen_rect().centerx
       textRect.y = y
-      deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-      misc.screen.blit(misc.background, deleteRect, deleteRect)
+      _clear_row(textRect.y, textRect.height)
       misc.screen.blit(text, textRect)
       y = y + textRect.height + self.gap
       i = i + 1
@@ -146,7 +162,7 @@ class SimpleTitleOnlyMenu(Menu):
     # Print the title
     textTitle = self.titleFont.render(self.title, 1, misc.lightColor)
     textRectTitle = textTitle.get_rect()
-    textRectTitle.centerx = misc.screen.get_rect().centerx
+    textRectTitle.centerx = _screen_rect().centerx
     textRectTitle.y = y
     y = y + textRectTitle.height/2
 
@@ -154,12 +170,10 @@ class SimpleTitleOnlyMenu(Menu):
     #text = self.titleFont.render("---------------", 1, misc.lightColor)
     text = self.titleFont.render("...............", 1, misc.lightColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    deleteRectTitle = (0, textRectTitle.y, 1024*misc.zoom, textRectTitle.height)
-    misc.screen.blit(misc.background, deleteRectTitle, deleteRectTitle)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRectTitle.y, textRectTitle.height)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(textTitle, textRectTitle)
     misc.screen.blit(text, textRect)
     y = y + textRect.height
@@ -238,15 +252,14 @@ class ChooseTrackMenu(Menu):
       else:
         text = self.itemFont.render(self.listAvailableTrackNames[i-1], 1, misc.darkColor)
       textRect = text.get_rect()
-      textRect.centerx = misc.screen.get_rect().centerx
+      textRect.centerx = _screen_rect().centerx
       textRect.y = y
-      deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height + iconTrack.get_rect().height + 10)
-      misc.screen.blit(misc.background, deleteRect, deleteRect)
+      _clear_row(textRect.y, textRect.height + iconTrack.get_rect().height + 10)
       misc.screen.blit(text, textRect)
       y = y + textRect.height + self.gap
       if i == self.select:
         iconRect = iconTrack.get_rect()
-        iconRect.centerx = misc.screen.get_rect().centerx
+        iconRect.centerx = _screen_rect().centerx
         iconRect.y = y
         y = y + self.gap + 76*misc.zoom
         misc.screen.blit(iconTrack, iconRect)
@@ -311,10 +324,9 @@ class ChooseValueMenu(Menu):
       else:
         text = self.itemFont.render(str(i), 1, misc.darkColor)
       textRect = text.get_rect()
-      textRect.centerx = misc.screen.get_rect().centerx
+      textRect.centerx = _screen_rect().centerx
       textRect.y = y
-      deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-      misc.screen.blit(misc.background, deleteRect, deleteRect)
+      _clear_row(textRect.y, textRect.height)
       misc.screen.blit(text, textRect)
       y = y + textRect.height + self.gap
       i = i + 1
@@ -370,10 +382,9 @@ class ChooseTextMenu(Menu):
     else:
       text = self.itemFont.render(self.text, 1, misc.lightColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
 
     pygame.display.flip()
@@ -528,17 +539,13 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("<     >", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
-    misc.screen.blit(text, textRect)
-
-    # Print the selected Car
     carRect = self.listCars[self.carColor - 1].get_rect()
-    carRect.centerx = misc.screen.get_rect().centerx
+    carRect.centerx = _screen_rect().centerx
     carRect.y = y + (textRect.height - carRect.height)/2
-
+    _clear_row(textRect.y, max(textRect.height, carRect.height))
+    misc.screen.blit(text, textRect)
     misc.screen.blit(self.listCars[self.carColor - 1], carRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -550,10 +557,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render(self.pseudo, 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -564,10 +570,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -581,10 +586,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("AccelKey: " + pygame.key.name(self.keyAccel), 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -598,10 +602,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("BrakeKey: " + pygame.key.name(self.keyBrake), 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -615,10 +618,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("LeftKey: " + pygame.key.name(self.keyLeft), 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -632,10 +634,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("RightKey: " + pygame.key.name(self.keyRight), 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -646,10 +647,9 @@ class ChooseHumanPlayerMenu(Menu):
     else:
       text = self.itemFont.render("GO", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -761,17 +761,13 @@ class ChooseRobotPlayerMenu(Menu):
     else:
       text = self.itemFont.render("<     >", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
-    misc.screen.blit(text, textRect)
-
-    # Print the selected Car
     carRect = self.listCars[self.carColor - 1].get_rect()
-    carRect.centerx = misc.screen.get_rect().centerx
+    carRect.centerx = _screen_rect().centerx
     carRect.y = y + (textRect.height - carRect.height)/2
-
+    _clear_row(textRect.y, max(textRect.height, carRect.height))
+    misc.screen.blit(text, textRect)
     misc.screen.blit(self.listCars[self.carColor - 1], carRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -782,10 +778,9 @@ class ChooseRobotPlayerMenu(Menu):
     else:
       text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -796,10 +791,9 @@ class ChooseRobotPlayerMenu(Menu):
     else:
       text = self.itemFont.render("GO", 1, misc.darkColor)
     textRect = text.get_rect()
-    textRect.centerx = misc.screen.get_rect().centerx
+    textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    deleteRect = (0, textRect.y, 1024*misc.zoom, textRect.height)
-    misc.screen.blit(misc.background, deleteRect, deleteRect)
+    _clear_row(textRect.y, textRect.height)
     misc.screen.blit(text, textRect)
     y = y + textRect.height + self.gap
     i = i + 1
@@ -1066,7 +1060,7 @@ class MenuHiscores(Menu):
     except Exception:
       return
 
-    deleteRect = (0, self.startY, 1024*misc.zoom, 768*misc.zoom-self.startY)
+    deleteRect = pygame.Rect(0, self.startY, _screen_rect().width, _screen_rect().height - self.startY)
     misc.screen.blit(misc.background, deleteRect, deleteRect)
 
     # If there'are skipped items, display ...
