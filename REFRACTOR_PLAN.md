@@ -2,11 +2,11 @@
 
 ## Feature name: Menu Event Loop Refactor
 - Technical Description: Extract a shared menu event/render loop (navigation callbacks, select handler) to replace duplicated while-key processing blocks across SimpleMenu/ChooseTrackMenu/etc.; remove per-class polling code and reuse a single navigation state + render function.
-- Customer Description: Menus feel snappier and consistent; adding new menus becomes easier, reducing bugs when navigating options.
+- Customer Description: Menus feel snappier and consistent; adding new menus becomes easier, reducing bugs when navigating options. -Done
 
 ## Feature name: Menu Rendering Helpers
 - Technical Description: Centralize common drawing routines (title, selectable list rows, row clearing) and replace magic geometry numbers with helpers derived from `misc.screen`; layouts auto-scale with resolution/zoom.
-- Customer Description: Cleaner, more consistent screens across resolutions; fewer visual glitches when changing display settings.
+- Customer Description: Cleaner, more consistent screens across resolutions; fewer visual glitches when changing display settings. -Done
 
 ## Feature name: Shared Resource Discovery
 - Technical Description: Create cached utilities for discovering cars/tracks and loading their icons instead of scanning the filesystem in each menu; reuse loaded surfaces.
@@ -18,7 +18,7 @@
 
 ## Feature name: Player Input Polymorphism
 - Technical Description: Move input handling into Player subclasses (e.g., `handle_event`/`update_controls`) instead of class-name conditionals inside the game loop; bots/humans manage their own state.
-- Customer Description: Better responsiveness and easier support for new control types (pads/network) without regressions.
+- Customer Description: Better responsiveness and easier support for new control types (pads/network) without regressions. -Done
 
 ## Feature name: Broad-Phase Collisions
 - Technical Description: Add a coarse spatial grid/AABB pass before detailed rect collisions to cut O(n²) checks between distant cars; only test likely pairs.
