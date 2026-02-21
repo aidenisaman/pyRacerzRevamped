@@ -308,6 +308,11 @@ class Game:
          for play2 in self.listPlayer:
            if play == play2:
              continue
+           # Prevent collisions between cars on different bridge levels in desert tracks
+           if currentTrack.name.startswith("desert"):
+             # Only allow collision if both are on the bridge (80) or both are not
+             if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
+               continue
            playCollisionRects = []
            play2CollisionRects = []
            listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
