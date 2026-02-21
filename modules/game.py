@@ -379,17 +379,21 @@ class Game:
             play.car.image=play.car.cars2[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
 
           # If there's something on the car (the car is in a tunnel), manage mask to hide the car
-          part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
-          part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
-          partArray = pygame.surfarray.array2d(part)
-          aX = 0
-          for arrayX in partArray:
-            aY = 0
-            for col in arrayX:
-              if col % 256 != 0:
-                play.car.image.set_at((aX, aY), (255, 255, 255, 0))
-              aY = aY + 1
-            aX = aX + 1
+          # Specific code for desertf in which the car will be shown above overpass at checkpoint 5 (red=80), reverts when reaching checkpoint 6 (red=96)
+          if currentTrack.name.startswith("desert") and play.lastCheckpoint == 80:
+            pass
+          else:
+            part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
+            part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
+            partArray = pygame.surfarray.array2d(part)
+            aX = 0
+            for arrayX in partArray:
+              aY = 0
+              for col in arrayX:
+                if col % 256 != 0:
+                  play.car.image.set_at((aX, aY), (255, 255, 255, 0))
+                aY = aY + 1
+              aX = aX + 1
 
           # Display tires slide
           if play.car.slide == 1 or play.car.slide == 2:
