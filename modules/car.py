@@ -183,10 +183,6 @@ class Car(pygame.sprite.Sprite):
 
     self.movepos = [0.0,0.0]
 
-    # DRIFT MECHANIC - Initialisation
-    self.drifting = False
-    self.driftIntensity = 0.0
-
   def update(self):
     ''' Function called at each frame to update car sprite...
     It's the main computation method for car movement !'''
@@ -247,30 +243,8 @@ class Car(pygame.sprite.Sprite):
 
     g = (g0 + g1 + g2 + g3)/4.0
 
-    # DRIFT MECHANIC - Condition Check
-    DRIFT_SPEED_THRESHOLD = 0.70   # fraction of maxSpeed required to drift
-    DRIFT_STEER_THRESHOLD = 0.50   # |angleW| value (0–1) required to drift
-
-    speedRatio  = self.speed / self.maxSpeed if self.maxSpeed > 0 else 0
-    steerRatio  = abs(self.angleW)           # already clamped to [0, 1]
-
-    speedExcess = max(0.0, (speedRatio  - DRIFT_SPEED_THRESHOLD) / (1.0 - DRIFT_SPEED_THRESHOLD))
-    steerExcess = max(0.0, (steerRatio  - DRIFT_STEER_THRESHOLD) / (1.0 - DRIFT_STEER_THRESHOLD))
-
-    # Drift intensity is the product: both conditions must be met
-    targetDriftIntensity = speedExcess * steerExcess
-
-    # Smooth the intensity so it ramps up/down gradually (no jarring transitions)
-    self.driftIntensity = 0.85 * self.driftIntensity + 0.15 * targetDriftIntensity
-    self.drifting = self.driftIntensity > 0.05
-
     # Compute Accel
-    # During a drift, traction is reduced proportionally to drift intensity.
-    # This reduces the effective grip so the car slides rather than grips.
-    DRIFT_TRACTION_REDUCTION = 0.45   # at full drift, traction drops by up to 45%
-    tractionMultiplier = 1.0 - (self.driftIntensity * DRIFT_TRACTION_REDUCTION)
-
-    self.accel = self.power * (1.0*self.throttle - 1.7*self.brake) * (g/255.0) * tractionMultiplier
+    self.accel = self.power * (1.0*self.throttle - 1.7*self.brake) * (g/255.0)
 
     # Engine brake
     if self.throttle == 0.0 and self.speed > 0:
@@ -342,12 +316,6 @@ class Car(pygame.sprite.Sprite):
       self.accelL = self.accelL * (1 + 1.3*abs(self.accel)/(1.7*self.power))
       self.speed = self.speed - abs(0.6*self.accel)
 
-    # DRIFT MECHANIC 
-    if self.drifting:
-      DRIFT_LATERAL_AMPLIFY = 2.2
-      lateralMultiplier = 1.0 + (DRIFT_LATERAL_AMPLIFY - 1.0) * self.driftIntensity
-      self.accelL = self.accelL * lateralMultiplier
-
     self.speedL = 0.2*self.speedL + self.accelL
 
     # If the speed is too slow
@@ -390,9 +358,6 @@ class Car(pygame.sprite.Sprite):
       self.angle = oldoldAngle
       self.speed = -0.2*oldSpeed
       self.speedL = 0
-      # Cancel drift on collision so the car doesn't keep sliding into the wall
-      self.driftIntensity = 0.0
-      self.drifting = False
 
     self.movepos[0] = int(self.x) - int(self.ox)
     self.movepos[1] = int(self.y) - int(self.oy)
@@ -412,10 +377,6 @@ class Car(pygame.sprite.Sprite):
     # If the car is braking, the slide is larger
     if self.accel < -0.005:
       self.slide = 2
-
-    # During a drift, always show tyre marks (at least slide level 1)
-    if self.drifting and self.slide == 0:
-      self.slide = 1
 
   def doAccel(self):
     self.throttle = self.throttle + 0.1
