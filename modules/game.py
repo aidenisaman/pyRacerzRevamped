@@ -180,14 +180,49 @@ class Game:
               misc.stopMusic()
               return -1
             for play in self.listPlayer:
-              play.handle_keydown(event.key)
+              if play.__class__.__name__ == "HumanPlayer":
+                if event.key == play.keyAccel:
+                  play.keyAccelPressed = 1
+                if event.key == play.keyBrake:
+                  play.keyBrakePressed = 1
+                if event.key == play.keyLeft:
+                  play.keyLeftPressed = 1
+                if event.key == play.keyRight:
+                  play.keyRightPressed = 1
           elif event.type == KEYUP:
             for play in self.listPlayer:
-              play.handle_keyup(event.key)
+              if play.__class__.__name__ == "HumanPlayer":
+                if event.key == play.keyAccel:
+                  play.keyAccelPressed = 0
+                if event.key == play.keyBrake:
+                  play.keyBrakePressed = 0
+                if event.key == play.keyLeft:
+                  play.keyLeftPressed = 0
+                if event.key == play.keyRight:
+                  play.keyRightPressed = 0
 
-        # Apply per-player control updates
+        # Make some modifications on the car commands
         for play in self.listPlayer:
-          play.update_controls()
+
+          # Bot players need to compute
+          if play.__class__.__name__ == "RobotPlayer":
+            play.compute()
+
+          if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
+            if play.keyAccelPressed == 1:
+              play.car.doAccel()
+            else:
+              play.car.noAccel()
+            if play.keyBrakePressed == 1:
+              play.car.doBrake()
+            else:
+              play.car.noBrake()
+            if play.keyLeftPressed == 1:
+              play.car.doLeft()
+            if play.keyRightPressed == 1:
+              play.car.doRight()
+            if play.keyLeftPressed == 0 and play.keyRightPressed == 0:
+              play.car.noWheel()
 
         # TODO ? Manage Rect.union (oldRect and newRect of a car) to optimize !!!!
         # Append the old rect to the dirty Rects
