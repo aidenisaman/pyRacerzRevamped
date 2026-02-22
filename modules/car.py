@@ -248,7 +248,7 @@ class Car(pygame.sprite.Sprite):
     g = (g0 + g1 + g2 + g3)/4.0
 
     # DRIFT MECHANIC - Condition Check
-    DRIFT_SPEED_THRESHOLD = 0.50   # fraction of maxSpeed required to drift
+    DRIFT_SPEED_THRESHOLD = 0.70   # fraction of maxSpeed required to drift
     DRIFT_STEER_THRESHOLD = 0.50   # |angleW| value (0–1) required to drift
 
     speedRatio  = self.speed / self.maxSpeed if self.maxSpeed > 0 else 0
@@ -344,7 +344,7 @@ class Car(pygame.sprite.Sprite):
 
     # DRIFT MECHANIC 
     if self.drifting:
-      DRIFT_LATERAL_AMPLIFY = 3.5
+      DRIFT_LATERAL_AMPLIFY = 2.2
       lateralMultiplier = 1.0 + (DRIFT_LATERAL_AMPLIFY - 1.0) * self.driftIntensity
       self.accelL = self.accelL * lateralMultiplier
 
