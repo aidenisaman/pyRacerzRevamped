@@ -177,26 +177,29 @@ def addHiScore(track, player):
 
   # If the Level is not represented create it and put the Hi-scores
   if not confFile.has_option("hi " + track.name, "level" + str(level)):
-    h = sha1.new(str(track.name))
-    h.update(str("level" + str(level)))
-    h.update(player.name)
-    h.update(str(player.bestChrono))
+    h = sha1()
+    h.update(str(track.name).encode())
+    h.update(str("level" + str(level)).encode())
+    h.update(player.name.encode())
+    h.update(str(player.bestChrono).encode())
     fwrite = open(".pyRacerz.conf", "w+")
     confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
     confFile.write(fwrite)
     return 1
   else:
     hi = confFile.get("hi " + track.name, "level" + str(level)).split()
-    h = sha1.new(str(track.name))
-    h.update(str("level" + str(level)))
-    h.update(hi[0])
-    h.update(hi[1])
+    h = sha1()
+    h.update(str(track.name).encode())
+    h.update(str("level" + str(level)).encode())
+    h.update(hi[0].encode())
+    h.update(hi[1].encode())
     if hi[2] == h.hexdigest():
       if int(hi[1]) > player.bestChrono:
-        h = sha1.new(str(track.name))
-        h.update(str("level" + str(level)))
-        h.update(player.name)
-        h.update(str(player.bestChrono))
+        h = sha1()
+        h.update(str(track.name).encode())
+        h.update(str("level" + str(level)).encode())
+        h.update(player.name.encode())
+        h.update(str(player.bestChrono).encode())
         fwrite = open(".pyRacerz.conf", "w+")
         confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
         confFile.write(fwrite)
@@ -205,10 +208,11 @@ def addHiScore(track, player):
         return 0
     else:
       # If the HiScore is Corrupted, erase it
-      h = sha1.new(str(track.name))
-      h.update(str("level" + str(level)))
-      h.update(player.name)
-      h.update(str(player.bestChrono))
+      h = sha1()
+      h.update(str(track.name).encode())
+      h.update(str("level" + str(level)).encode())
+      h.update(player.name.encode())
+      h.update(str(player.bestChrono).encode())
       fwrite = open(".pyRacerz.conf", "w+")
       confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
       confFile.write(fwrite)
@@ -228,8 +232,9 @@ def getUnlockLevel():
     return 0
 
   key = confFile.get("unlockLevel", "key").split()
-  h = sha1.new("pyRacerz")
-  h.update(str(key[0]))
+  h = sha1()
+  h.update(str("pyRacerz").encode())
+  h.update(str(key[0]).encode())
   if h.hexdigest() == key[1]:
     return key[0]
   else:
@@ -255,8 +260,9 @@ def setUnlockLevel(lck):
     confFile.write(fwrite)
     confFile.read_file(open(".pyRacerz.conf", "r"))
 
-  h = sha1.new("pyRacerz")
-  h.update(str(lck))
+  h = sha1()
+  h.update(str("pyRacerz").encode())
+  h.update(str(lck).encode())
   fwrite = open(".pyRacerz.conf", "w+")
   confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())
   confFile.write(fwrite)
