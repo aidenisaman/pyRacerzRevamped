@@ -558,7 +558,7 @@ class Game:
                     # Draw gray circle for smoke
                     pygame.draw.circle(
                         smokeSurface,
-                        (180, 180, 180),
+                        (255, 255, 255),
                         (int(particle['size']//2), int(particle['size']//2)),
                         int(particle['size']//2)
                     )

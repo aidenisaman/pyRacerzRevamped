@@ -429,24 +429,23 @@ class Car(pygame.sprite.Sprite):
       rightRearX = self.x + math.cos(self.angle) * self.height/2 + math.cos(math.pi/2.0-self.angle) * self.width/2
       rightRearY = self.y + math.sin(self.angle) * self.height/2 - math.sin(math.pi/2.0-self.angle) * self.width/2
       
-      # Limit total particles to avoid performance issues
       if len(self.smokeParticles) < 100:
-        # Left wheel smoke
-        self.smokeParticles.append({
-          'x': leftRearX,
-          'y': leftRearY,
-          'life': 30,  # frames to live
-          'size': int(5 + self.driftIntensity * 10),
-          'alpha': 150
-        })
-        # Right wheel smoke
-        self.smokeParticles.append({
-          'x': rightRearX,
-          'y': rightRearY,
-          'life': 30,
-          'size': int(5 + self.driftIntensity * 10),
-          'alpha': 150
-        })
+          # Left wheel smoke
+          self.smokeParticles.append({
+              'x': leftRearX,
+              'y': leftRearY,
+              'life': 60,  # CHANGED: Lasts 2x longer
+              'size': int(15 + self.driftIntensity * 20),  # CHANGED: Bigger smoke
+              'alpha': 255  # CHANGED: Fully opaque white
+          })
+          # Right wheel smoke
+          self.smokeParticles.append({
+              'x': rightRearX,
+              'y': rightRearY,
+              'life': 60,  # CHANGED: Lasts 2x longer
+              'size': int(15 + self.driftIntensity * 20),  # CHANGED: Bigger smoke
+              'alpha': 255  # CHANGED: Fully opaque white
+          })
 
     # DRIFT SMOKE - Updated particles
     newSmokeParticles = []
