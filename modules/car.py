@@ -428,34 +428,34 @@ class Car(pygame.sprite.Sprite):
       
       rightRearX = self.x + math.cos(self.angle) * self.height/2 + math.cos(math.pi/2.0-self.angle) * self.width/2
       rightRearY = self.y + math.sin(self.angle) * self.height/2 - math.sin(math.pi/2.0-self.angle) * self.width/2
-      
+            
       if len(self.smokeParticles) < 100:
           # Left wheel smoke
           self.smokeParticles.append({
               'x': leftRearX,
               'y': leftRearY,
-              'life': 60,  # CHANGED: Lasts 2x longer
-              'size': int(15 + self.driftIntensity * 20),  # CHANGED: Bigger smoke
-              'alpha': 255  # CHANGED: Fully opaque white
+              'life': 400,  
+              'size': int(6 + self.driftIntensity * 6),  
+              'alpha': 240  
           })
           # Right wheel smoke
           self.smokeParticles.append({
               'x': rightRearX,
               'y': rightRearY,
-              'life': 60,  # CHANGED: Lasts 2x longer
-              'size': int(15 + self.driftIntensity * 20),  # CHANGED: Bigger smoke
-              'alpha': 255  # CHANGED: Fully opaque white
+              'life': 400,  
+              'size': int(6 + self.driftIntensity * 6), 
+              'alpha': 240  
           })
 
-    # DRIFT SMOKE - Updated particles
+    # DRIFT SMOKE 
     newSmokeParticles = []
     for particle in self.smokeParticles:
-      particle['life'] -= 1
-      particle['size'] += 0.5  # Smoke expands
-      particle['alpha'] -= 5   # Fades out
-      
-      if particle['life'] > 0 and particle['alpha'] > 0:
-        newSmokeParticles.append(particle)
+        particle['life'] -= 1
+        particle['size'] += 0.2 
+        particle['alpha'] -= 0.6  
+        
+        if particle['life'] > 0 and particle['alpha'] > 0:
+            newSmokeParticles.append(particle)
 
     self.smokeParticles = newSmokeParticles
 
