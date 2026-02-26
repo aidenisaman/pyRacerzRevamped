@@ -549,6 +549,28 @@ class Game:
             # Display the car
             play.car.sprite.draw(misc.screen)
 
+                # DRIFT SMOKE - Draw smoke particles for all players
+            for play_smoke in self.listPlayer:
+                for particle in play_smoke.car.smokeParticles:
+                    smokeSurface = pygame.Surface((int(particle['size']), int(particle['size'])))
+                    smokeSurface.set_alpha(int(particle['alpha']))
+                    
+                    # Draw gray circle for smoke
+                    pygame.draw.circle(
+                        smokeSurface,
+                        (180, 180, 180),
+                        (int(particle['size']//2), int(particle['size']//2)),
+                        int(particle['size']//2)
+                    )
+                    
+                    misc.screen.blit(
+                        smokeSurface,
+                        (int(particle['x'] - particle['size']/2),
+                        int(particle['y'] - particle['size']/2))
+                    )
+
+
+
           elif play.car.blink == 1 and play.car.blinkCount >= 10:
             if not paused:
               play.car.blinkCount = play.car.blinkCount +1
@@ -688,7 +710,7 @@ class Game:
           else:
             nbFrame = nbFrame + 1
 
-          # ✅ CRITICAL FIX: Use flip() instead of update(l) for cross-platform compatibility
+          # CRITICAL FIX: Use flip() instead of update(l) for cross-platform compatibility
           # This ensures HUD and minimap are visible on both Mac and Windows
           pygame.display.flip()
           i=0

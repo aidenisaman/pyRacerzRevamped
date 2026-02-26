@@ -33,7 +33,7 @@ class Car(pygame.sprite.Sprite):
     imageLight = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + "B.png")).convert_alpha()
     
     # Car size scaling
-    self.scale = 1.5   # car size control (ONLY CAR)
+    self.scale = 1.5   # car size control 
     
     self.sprite = pygame.sprite.RenderPlain(self)
 
@@ -186,6 +186,9 @@ class Car(pygame.sprite.Sprite):
     # DRIFT MECHANIC - Initialisation
     self.drifting = False
     self.driftIntensity = 0.0
+    
+    # DRIFT SMOKE - Initialization
+    self.smokeParticles = []
 
   def update(self):
     ''' Function called at each frame to update car sprite...
@@ -260,7 +263,7 @@ class Car(pygame.sprite.Sprite):
     # Drift intensity is the product: both conditions must be met
     targetDriftIntensity = speedExcess * steerExcess
 
-    # Smooth the intensity so it ramps up/down gradually (no jarring transitions)
+    # Smooth the intensity so it ramps up/down gradually 
     self.driftIntensity = 0.85 * self.driftIntensity + 0.15 * targetDriftIntensity
     self.drifting = self.driftIntensity > 0.05
 
@@ -416,6 +419,46 @@ class Car(pygame.sprite.Sprite):
     # During a drift, always show tyre marks (at least slide level 1)
     if self.drifting and self.slide == 0:
       self.slide = 1
+
+    # DRIFT SMOKE - Generate particles while drifting
+    if self.drifting and self.driftIntensity > 0.2:
+      # Calculate rear wheel positions
+      leftRearX = self.x + math.cos(self.angle) * self.height/2 - math.cos(math.pi/2.0-self.angle) * self.width/2
+      leftRearY = self.y + math.sin(self.angle) * self.height/2 + math.sin(math.pi/2.0-self.angle) * self.width/2
+      
+      rightRearX = self.x + math.cos(self.angle) * self.height/2 + math.cos(math.pi/2.0-self.angle) * self.width/2
+      rightRearY = self.y + math.sin(self.angle) * self.height/2 - math.sin(math.pi/2.0-self.angle) * self.width/2
+      
+      # Limit total particles to avoid performance issues
+      if len(self.smokeParticles) < 100:
+        # Left wheel smoke
+        self.smokeParticles.append({
+          'x': leftRearX,
+          'y': leftRearY,
+          'life': 30,  # frames to live
+          'size': int(5 + self.driftIntensity * 10),
+          'alpha': 150
+        })
+        # Right wheel smoke
+        self.smokeParticles.append({
+          'x': rightRearX,
+          'y': rightRearY,
+          'life': 30,
+          'size': int(5 + self.driftIntensity * 10),
+          'alpha': 150
+        })
+
+    # DRIFT SMOKE - Updated particles
+    newSmokeParticles = []
+    for particle in self.smokeParticles:
+      particle['life'] -= 1
+      particle['size'] += 0.5  # Smoke expands
+      particle['alpha'] -= 5   # Fades out
+      
+      if particle['life'] > 0 and particle['alpha'] > 0:
+        newSmokeParticles.append(particle)
+
+    self.smokeParticles = newSmokeParticles
 
   def doAccel(self):
     self.throttle = self.throttle + 0.1
