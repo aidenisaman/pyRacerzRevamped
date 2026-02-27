@@ -186,9 +186,6 @@ class Car(pygame.sprite.Sprite):
     # DRIFT MECHANIC - Initialisation
     self.drifting = False
     self.driftIntensity = 0.0
-    
-    # DRIFT SMOKE - Initialization
-    self.smokeParticles = []
 
   def update(self):
     ''' Function called at each frame to update car sprite...
@@ -419,45 +416,6 @@ class Car(pygame.sprite.Sprite):
     # During a drift, always show tyre marks (at least slide level 1)
     if self.drifting and self.slide == 0:
       self.slide = 1
-
-    # DRIFT SMOKE - Generate particles while drifting
-    if self.drifting and self.driftIntensity > 0.2:
-      # Calculate rear wheel positions
-      leftRearX = self.x + math.cos(self.angle) * self.height/2 - math.cos(math.pi/2.0-self.angle) * self.width/2
-      leftRearY = self.y + math.sin(self.angle) * self.height/2 + math.sin(math.pi/2.0-self.angle) * self.width/2
-      
-      rightRearX = self.x + math.cos(self.angle) * self.height/2 + math.cos(math.pi/2.0-self.angle) * self.width/2
-      rightRearY = self.y + math.sin(self.angle) * self.height/2 - math.sin(math.pi/2.0-self.angle) * self.width/2
-            
-      if len(self.smokeParticles) < 100:
-          # Left wheel smoke
-          self.smokeParticles.append({
-              'x': leftRearX,
-              'y': leftRearY,
-              'life': 400,  
-              'size': int(6 + self.driftIntensity * 6),  
-              'alpha': 240  
-          })
-          # Right wheel smoke
-          self.smokeParticles.append({
-              'x': rightRearX,
-              'y': rightRearY,
-              'life': 400,  
-              'size': int(6 + self.driftIntensity * 6), 
-              'alpha': 240  
-          })
-
-    # DRIFT SMOKE 
-    newSmokeParticles = []
-    for particle in self.smokeParticles:
-        particle['life'] -= 1
-        particle['size'] += 0.2 
-        particle['alpha'] -= 0.6  
-        
-        if particle['life'] > 0 and particle['alpha'] > 0:
-            newSmokeParticles.append(particle)
-
-    self.smokeParticles = newSmokeParticles
 
   def doAccel(self):
     self.throttle = self.throttle + 0.1
