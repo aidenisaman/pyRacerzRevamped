@@ -22,7 +22,7 @@
 
 ## Feature name: Broad-Phase Collisions
 - Technical Description: Add a coarse spatial grid/AABB pass before detailed rect collisions to cut O(n²) checks between distant cars; only test likely pairs.
-- Customer Description: Higher frame rates and smoother races with more cars on screen.
+- Customer Description: Higher frame rates and smoother races with more cars on screen. -Done
 
 ## Feature name: Sprite Rotation Cache
 - Technical Description: Cache per-color rotated car sprites at module level and share them across Car instances; avoid regenerating 256 rotations per car creation.
@@ -30,7 +30,7 @@
 
 ## Feature name: Car Update Math Simplification
 - Technical Description: Hoist repeated `sin/cos/sqrt/acos` computations inside `Car.update` and reuse values; minimize per-frame heavy math.
-- Customer Description: More stable FPS and smoother motion, especially on lower-end hardware.
+- Customer Description: More stable FPS and smoother motion, especially on lower-end hardware. -Done
 
 ## Feature name: Binary Replay Serialization
 - Technical Description: Serialize replay frames as binary blocks (array/struct) and read via indexed access instead of string concat + `pop(0)`; reduces I/O and CPU overhead.
@@ -38,7 +38,7 @@
 
 ## Feature name: Safer Config/Hi-Score I/O
 - Technical Description: Modernize config handling with context managers and `hashlib.sha1()`, caching reads/writes to avoid corruption; encapsulate persistence behind a small helper.
-- Customer Description: Hi-scores and unlocks are more reliable; less chance of losing progress.
+- Customer Description: Hi-scores and unlocks are more reliable; less chance of losing progress. -done
 
 ## Feature name: CLI Parsing Modernization
 - Technical Description: Replace manual argument parsing in `pyRacerz.py` with `argparse`, defining flags, defaults, and help; centralize option handling.
