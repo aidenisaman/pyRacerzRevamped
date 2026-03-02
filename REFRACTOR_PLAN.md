@@ -22,7 +22,7 @@
 
 ## Feature name: Broad-Phase Collisions
 - Technical Description: Add a coarse spatial grid/AABB pass before detailed rect collisions to cut O(n²) checks between distant cars; only test likely pairs.
-- Customer Description: Higher frame rates and smoother races with more cars on screen.
+- Customer Description: Higher frame rates and smoother races with more cars on screen. -Done
 
 ## Feature name: Sprite Rotation Cache
 - Technical Description: Cache per-color rotated car sprites at module level and share them across Car instances; avoid regenerating 256 rotations per car creation.
@@ -42,4 +42,4 @@
 
 ## Feature name: CLI Parsing Modernization
 - Technical Description: Replace manual argument parsing in `pyRacerz.py` with `argparse`, defining flags, defaults, and help; centralize option handling.
-- Customer Description: Clearer command-line options and fewer startup errors when launching with custom settings.
+- Customer Description: Clearer command-line options and fewer startup errors when launching with custom settings. -Done
