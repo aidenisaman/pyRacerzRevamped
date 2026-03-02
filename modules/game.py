@@ -313,6 +313,9 @@ class Game:
              # Only allow collision if both are on the bridge (80) or both are not
              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
                continue
+            if currentTrack.name.startswith("city"):
+              if (play.lastCheckpoint == 32) != (play2.lastCheckpoint == 32):
+                continue
            playCollisionRects = []
            play2CollisionRects = []
            listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
@@ -386,6 +389,21 @@ class Game:
           # If there's something on the car (the car is in a tunnel), manage mask to hide the car
           # Specific code for desertf in which the car will be shown above overpass at checkpoint 5 (red=80), reverts when reaching checkpoint 6 (red=96)
           if currentTrack.name.startswith("desert") and play.lastCheckpoint == 80:
+            pass
+          else:
+            part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
+            part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
+            partArray = pygame.surfarray.array2d(part)
+            aX = 0
+            for arrayX in partArray:
+              aY = 0
+              for col in arrayX:
+                if col % 256 != 0:
+                  play.car.image.set_at((aX, aY), (255, 255, 255, 0))
+                aY = aY + 1
+              aX = aX + 1
+
+          if currentTrack.name.startswith("city") and play.lastCheckpoint == 32:
             pass
           else:
             part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
