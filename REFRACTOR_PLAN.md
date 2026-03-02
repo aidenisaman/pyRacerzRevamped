@@ -42,4 +42,4 @@
 
 ## Feature name: CLI Parsing Modernization
 - Technical Description: Replace manual argument parsing in `pyRacerz.py` with `argparse`, defining flags, defaults, and help; centralize option handling.
-- Customer Description: Clearer command-line options and fewer startup errors when launching with custom settings.
+- Customer Description: Clearer command-line options and fewer startup errors when launching with custom settings. -Done
