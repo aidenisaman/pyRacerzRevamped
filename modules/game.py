@@ -305,63 +305,63 @@ class Game:
 
         # Manage Collisions
         for play in self.listPlayer:
-         for play2 in self.listPlayer:
-           if play == play2:
+          for play2 in self.listPlayer:
+            if play == play2:
              continue
            # Prevent collisions between cars on different bridge levels in desert tracks
-           if currentTrack.name.startswith("desert"):
+            if currentTrack.name.startswith("desert"):
              # Only allow collision if both are on the bridge (80) or both are not
-             if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
+              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
                continue
             if currentTrack.name.startswith("city"):
-              if (play.lastCheckpoint == 32) != (play2.lastCheckpoint == 32):
+              if (play.lastCheckpoint == 48) != (play2.lastCheckpoint == 48):
                 continue
-           playCollisionRects = []
-           play2CollisionRects = []
-           listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(0)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(1)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(2)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(3)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
+            playCollisionRects = []
+            play2CollisionRects = []
+            listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(0)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(1)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(2)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(3)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
 
-           playCollisionRects.sort()
-           play2CollisionRects.sort()
-           #if playCollisionRects != []:
-             #print playCollisionRects
-           if playCollisionRects == [0]:
-             play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
-           elif playCollisionRects == [1]:
-             play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
-           elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
-             play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
-             play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects != [] :
-             #TODO
-             #print "Strange Collision !!!"
-             #print playCollisionRects
-             play.car.newSpeed = 0
+            playCollisionRects.sort()
+            play2CollisionRects.sort()
+            #if playCollisionRects != []:
+              #print playCollisionRects
+            if playCollisionRects == [0]:
+              play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
+            elif playCollisionRects == [1]:
+              play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
+            elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
+              play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
+              play.car.newSpeed = 0
+            elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
+              play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
+              play.car.newSpeed = 0
+            elif playCollisionRects != [] :
+              #TODO
+              #print "Strange Collision !!!"
+              #print playCollisionRects
+              play.car.newSpeed = 0
         
         for play in self.listPlayer:
           #print play.name
@@ -388,22 +388,7 @@ class Game:
 
           # If there's something on the car (the car is in a tunnel), manage mask to hide the car
           # Specific code for desertf in which the car will be shown above overpass at checkpoint 5 (red=80), reverts when reaching checkpoint 6 (red=96)
-          if currentTrack.name.startswith("desert") and play.lastCheckpoint == 80:
-            pass
-          else:
-            part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
-            part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
-            partArray = pygame.surfarray.array2d(part)
-            aX = 0
-            for arrayX in partArray:
-              aY = 0
-              for col in arrayX:
-                if col % 256 != 0:
-                  play.car.image.set_at((aX, aY), (255, 255, 255, 0))
-                aY = aY + 1
-              aX = aX + 1
-
-          if currentTrack.name.startswith("city") and play.lastCheckpoint == 32:
+          if (currentTrack.name.startswith("desert") and play.lastCheckpoint == 80) or (currentTrack.name.startswith("city") and play.lastCheckpoint == 48):
             pass
           else:
             part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
