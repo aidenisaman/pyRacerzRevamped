@@ -341,12 +341,13 @@ class Car(pygame.sprite.Sprite):
     if self.accel < -self.power*1.7*(2.0/3) and self.speed > 0:
       self.accelL = self.accelL * (1 + 1.3*abs(self.accel)/(1.7*self.power))
       self.speed = self.speed - abs(0.6*self.accel)
-
+      
     # DRIFT MECHANIC 
     if self.drifting:
-      DRIFT_LATERAL_AMPLIFY = 3.5
-      lateralMultiplier = 1.0 + (DRIFT_LATERAL_AMPLIFY - 1.0) * self.driftIntensity
-      self.accelL = self.accelL * lateralMultiplier
+      ALPHA = 0.8
+      newXvel = ALPHA * self.speed + (1.0 - ALPHA) * self.accelL
+      self.accelL = newXvel
+
 
     self.speedL = 0.2*self.speedL + self.accelL
 
@@ -414,8 +415,8 @@ class Car(pygame.sprite.Sprite):
       self.slide = 2
 
     # During a drift, always show tyre marks (at least slide level 1)
-    if self.drifting and self.slide == 0:
-      self.slide = 1
+    if self.drifting:
+      self.slide = 2
 
   def doAccel(self):
     self.throttle = self.throttle + 0.1
