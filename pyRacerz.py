@@ -34,6 +34,8 @@ import modules.menu as menu
 import modules.track as track
 import modules.replay as replay
 import modules.challenge as challenge
+import modules.network as network
+import modules.netgame as netgame
 
 def _build_arg_parser() -> argparse.ArgumentParser:
   """Return the configured ArgumentParser for pyRacerz."""
@@ -152,7 +154,7 @@ def main():
   select1 = 1
 
   while select1 != -1:
-    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License"])
+    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License", "Multiplayer"])
     select1 = menu1.getInput()
 
     # Single Race
@@ -298,6 +300,114 @@ def main():
     elif select1 == 7:
       licenseMenu = menu.MenuLicense(misc.titleFont, "license", 10*misc.zoom, misc.smallItemFont)
       misc.wait4Key()
+
+    # ── Network Multiplayer ────────────────────────────────────────────
+    elif select1 == 8:
+      net_mode = menu.NetworkModeMenu(misc.titleFont, misc.itemFont).getInput()
+
+      # ── HOST ──────────────────────────────────────────────────────
+      if net_mode == "host":
+        hostName = menu.ChooseTextMenu(
+          misc.titleFont, "multiplayer: enter your name",
+          5 * misc.zoom, misc.itemFont, 16).getInput()
+        if not hostName:
+          continue
+
+        trackInfo = menu.ChooseTrackMenu(
+          misc.titleFont, "network: chooseTrack",
+          2 * misc.zoom, misc.itemFont).getInput()
+        if trackInfo == -1:
+          continue
+
+        laps_menu = menu.ChooseValueMenu(
+          misc.titleFont, "network: chooseNbLaps",
+          0, misc.itemFont, 1, 10)
+        laps = laps_menu.getInput()
+        if laps == -1:
+          continue
+
+        thePlayer = menu.ChooseHumanPlayerMenu(
+          misc.titleFont, "network: choosePlayer",
+          5 * misc.zoom, misc.itemFont).getInput()
+        if thePlayer == -1:
+          continue
+
+        srv = network.NetworkServer()
+        srv.start()
+
+        # Lobby → Race loop (keeps cycling until host closes lobby)
+        while True:
+          lobby = menu.NetworkLobbyMenu(
+            srv, is_host=True,
+            local_name=hostName,
+            track_name=trackInfo[0],
+            track_rev=trackInfo[1],
+            host_color=thePlayer.car.color,
+            host_level=thePlayer.car.level,
+            laps=laps,
+          )
+          result = lobby.getInput()
+
+          if result["action"] == "close":
+            break   # srv already stopped inside lobby
+
+          elif result["action"] == "start":
+            currentTrack = track.Track(trackInfo[0], trackInfo[1])
+            misc.startRandomMusic()
+            netgame.NetworkHostRace(srv, thePlayer, currentTrack, laps).run()
+            misc.stopMusic()
+            # Loop back to lobby for another race
+
+      # ── JOIN ──────────────────────────────────────────────────────
+      elif net_mode == "join":
+        ip = menu.NetworkIPMenu(misc.titleFont, misc.itemFont).getInput()
+        if not ip:
+          continue
+
+        playerName = menu.ChooseTextMenu(
+          misc.titleFont, "multiplayer: enter your name",
+          5 * misc.zoom, misc.itemFont, 16).getInput()
+        if not playerName:
+          continue
+
+        cli = network.NetworkClient(ip)
+        connecting = menu.SimpleTitleOnlyMenu(
+          misc.titleFont, "Connecting to " + ip + "...")
+        connecting.refresh()
+        if not cli.connect():
+          fail = menu.SimpleTitleOnlyMenu(misc.titleFont, "Cannot connect!")
+          fail.refresh()
+          misc.wait4Key()
+          continue
+
+        cli.send({"type": "hello", "name": playerName})
+
+        # Lobby → Watch loop (cycles until client leaves)
+        while True:
+          lobby = menu.NetworkLobbyMenu(
+            cli, is_host=False,
+            local_name=playerName,
+          )
+          result = lobby.getInput()
+
+          if result["action"] == "leave":
+            break   # cli already disconnected inside lobby
+
+          elif result["action"] == "start":
+            misc.startRandomMusic()
+            netgame.NetworkWatchRace(
+              cli,
+              spectator_name=playerName,
+              host_name=result["host_name"],
+              host_color=result["host_color"],
+              host_level=result["host_level"],
+              track_name=result["track"],
+              track_reverse=result["reverse"],
+              laps=result["laps"],
+              remote_player_infos=result.get("roster", []),
+            ).run()
+            misc.stopMusic()
+            # Loop back to lobby for another race
 
 #import profile
 #profile.run('main()')
