@@ -350,24 +350,18 @@ class ChooseTextMenu(Menu):
 
     self.startY = titleMenu.startY
 
-    # "" is default
-    self.text = ""
+    # Shared text-input helper handles insert, backspace, and cursor display
+    self._input = misc.TextInput(self.maxLenght)
 
   def getInput(self):
   
     def handle_key(key):
       if key == K_ESCAPE:
         return None
-      if key >= K_a and key <= K_z:
-        if len(self.text) < self.maxLenght:
-          self.text = self.text + pygame.key.name(key).upper()
-        return "refresh"
-      if key == K_BACKSPACE:
-        if len(self.text) > 0:
-          self.text = self.text[:-1]
-        return "refresh"
       if key == K_RETURN:
-        return self.text
+        return self._input.text
+      if self._input.feed_key(key):
+        return "refresh"
       return None
 
     return _menu_loop(self.refresh, handle_key)
@@ -376,11 +370,8 @@ class ChooseTextMenu(Menu):
 
     y = self.startY
 
-    # Print the Text
-    if len(self.text) != self.maxLenght:
-      text = self.itemFont.render(self.text + "_", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render(self.text, 1, misc.lightColor)
+    # Print the Text (TextInput.render_text appends '_' cursor when not full)
+    text = self.itemFont.render(self._input.render_text(), 1, misc.lightColor)
     textRect = text.get_rect()
     textRect.centerx = _screen_rect().centerx
     textRect.y = y
@@ -433,6 +424,8 @@ class ChooseHumanPlayerMenu(Menu):
 
     listPseudos = ["ZUT", "ABC", "TOC", "TIC", "TAC", "PIL", "AJT", "KK", "OQP", "PQ", "SSH", "FTP", "PNG", "BSD", "BB", "PAF", "PIF", "HAL", "FSF", "OSS", "GNU", "TUX", "ZOB"]
     self.pseudo = listPseudos[random.randint(0, len(listPseudos)-1)]
+    # Shared text-input helper: max 3 chars, pre-seeded with random pseudo
+    self._pseudo_input = misc.TextInput(3, self.pseudo)
 
     self.level = 1
 
@@ -515,11 +508,8 @@ class ChooseHumanPlayerMenu(Menu):
           return "refresh"
         if self.select == 8:
           return player.HumanPlayer(self.pseudo, int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level, self.keyAccel, self.keyBrake, self.keyLeft, self.keyRight)
-      if key >= K_a and key <= K_z and self.select == 2:
-        if len(self.pseudo) >= 3:
-          self.pseudo = pygame.key.name(key).upper()
-        else:
-          self.pseudo = self.pseudo + pygame.key.name(key).upper()
+      if self.select == 2 and self._pseudo_input.feed_key(key):
+        self.pseudo = self._pseudo_input.text
         return "refresh"
       return None
 
@@ -551,11 +541,11 @@ class ChooseHumanPlayerMenu(Menu):
     i = i + 1
 
     
-    # 2. is Pseudo selection
+    # 2. is Pseudo selection (TextInput shows '_' cursor when field not full)
     if i == self.select:
-      text = self.itemFont.render(self.pseudo, 1, misc.lightColor)
+      text = self.itemFont.render(self._pseudo_input.render_text(), 1, misc.lightColor)
     else:
-      text = self.itemFont.render(self.pseudo, 1, misc.darkColor)
+      text = self.itemFont.render(self._pseudo_input.text, 1, misc.darkColor)
     textRect = text.get_rect()
     textRect.centerx = _screen_rect().centerx
     textRect.y = y

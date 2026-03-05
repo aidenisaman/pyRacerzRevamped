@@ -502,25 +502,21 @@ class Game:
         
         waitMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "recording Replay...")
 
-        if select2 != None and select2 != "":
-          f = open(os.path.join("replays", select2 + ".rep"), "wb")
-
-          # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
-          f.write(str(misc.VERSION) + " " + currentTrack.name + " " + str(currentTrack.reverse) + " " + str(masterChrono) + " " + str(len(self.listPlayer)) + " ")
+        if select2 is not None and select2 != "":
+          # Build text header then write binary frame data
+          header = (
+            f"{misc.VERSION} {currentTrack.name} {currentTrack.reverse} "
+            f"{masterChrono} {len(self.listPlayer)} "
+          )
           for play in self.listPlayer:
-            f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
-          f.write("\n")
+            header += f"{play.name} {play.car.color} {play.car.level} "
+          header += "\n"
 
-          # Put the array into the Replay File
-          stringFile = ""
-          try:
-            while 1:
-              stringFile = stringFile + str(replayArray.pop(0)) + " "
-          except Exception:
-            pass
-          f.write(zlib.compress(stringFile))
-
-          f.close()
+          with open(os.path.join("replays", select2 + ".rep"), "wb") as f:
+            f.write(header.encode())
+            # Serialize frame array as raw binary (5 signed 16-bit ints per
+            # player per frame), then zlib-compress for compact storage.
+            f.write(zlib.compress(replayArray.tobytes()))
 
       self.computeScores(currentTrack)
 
