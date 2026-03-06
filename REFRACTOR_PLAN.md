@@ -10,11 +10,11 @@
 
 ## Feature name: Shared Resource Discovery
 - Technical Description: Create cached utilities for discovering cars/tracks and loading their icons instead of scanning the filesystem in each menu; reuse loaded surfaces.
-- Customer Description: Faster menu entry and smoother scrolling when choosing cars or tracks, especially on slower machines.
+- Customer Description: Faster menu entry and smoother scrolling when choosing cars or tracks, especially on slower machines. -Scraped not doing
 
 ## Feature name: Reusable Text Entry
 - Technical Description: Replace ad-hoc name entry/backspace logic with a reusable text-input helper that handles insert/delete, max length, and ESC/ENTER without blocking the main loop.
-- Customer Description: Name/replay entry behaves predictably; no stuck screens while editing text.
+- Customer Description: Name/replay entry behaves predictably; no stuck screens while editing text. -done
 
 ## Feature name: Player Input Polymorphism
 - Technical Description: Move input handling into Player subclasses (e.g., `handle_event`/`update_controls`) instead of class-name conditionals inside the game loop; bots/humans manage their own state.
@@ -26,7 +26,7 @@
 
 ## Feature name: Sprite Rotation Cache
 - Technical Description: Cache per-color rotated car sprites at module level and share them across Car instances; avoid regenerating 256 rotations per car creation.
-- Customer Description: Faster loading and less stutter when adding players or bots; lower memory use.
+- Customer Description: Faster loading and less stutter when adding players or bots; lower memory use. -Not neccessary scrapped.
 
 ## Feature name: Car Update Math Simplification
 - Technical Description: Hoist repeated `sin/cos/sqrt/acos` computations inside `Car.update` and reuse values; minimize per-frame heavy math.
@@ -34,7 +34,7 @@
 
 ## Feature name: Binary Replay Serialization
 - Technical Description: Serialize replay frames as binary blocks (array/struct) and read via indexed access instead of string concat + `pop(0)`; reduces I/O and CPU overhead.
-- Customer Description: Replays save/load faster and play back more smoothly.
+- Customer Description: Replays save/load faster and play back more smoothly. -done
 
 ## Feature name: Safer Config/Hi-Score I/O
 - Technical Description: Modernize config handling with context managers and `hashlib.sha1()`, caching reads/writes to avoid corruption; encapsulate persistence behind a small helper.
