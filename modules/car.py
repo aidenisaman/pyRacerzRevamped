@@ -237,9 +237,12 @@ class Car(pygame.sprite.Sprite):
 
     g = (g0 + g1 + g2 + g3)/4.0
 
-    # DRIFT MECHANIC - Condition Check
-    DRIFT_SPEED_THRESHOLD = 0.65   # fraction of maxSpeed required to drift
-    DRIFT_STEER_THRESHOLD = 0.60   # |angleW| value (0-1) required to drift
+    # ── DRIFT MECHANIC ──────────────────────────────────────────────────────
+    # Drift triggers when the car is going fast AND steering sharply.
+    # Lowered steer threshold to 0.4 so it triggers on normal sharp corners,
+    # not only at full lock. Speed threshold kept at 0.60 (60% of max speed).
+    DRIFT_SPEED_THRESHOLD = 0.60   # triggers at 60% of max speed
+    DRIFT_STEER_THRESHOLD = 0.40   # triggers at 40% of full steer input
 
     speedRatio = self.speed / self.maxSpeed if self.maxSpeed > 0 else 0
     steerRatio = abs(self.angleW)
@@ -249,13 +252,20 @@ class Car(pygame.sprite.Sprite):
 
     targetDriftIntensity = speedExcess * steerExcess
 
-    self.driftIntensity = 0.85 * self.driftIntensity + 0.15 * targetDriftIntensity
+    # Drift builds quickly (0.25) and fades slowly (0.88) for a natural feel.
+    # Old values (0.15 / 0.85) made drift feel delayed and weak.
+    if targetDriftIntensity > self.driftIntensity:
+      self.driftIntensity = 0.75 * self.driftIntensity + 0.25 * targetDriftIntensity  # fast build
+    else:
+      self.driftIntensity = 0.88 * self.driftIntensity + 0.12 * targetDriftIntensity  # slow fade
+
     self.drifting = self.driftIntensity > 0.05
 
-    # Compute Accel
-    DRIFT_TRACTION_REDUCTION = 0.25
+    # Traction drops by 35% at full drift intensity (was 25% — too little grip loss)
+    DRIFT_TRACTION_REDUCTION = 0.35
     tractionMultiplier = 1.0 - (self.driftIntensity * DRIFT_TRACTION_REDUCTION)
 
+    # Compute Accel
     self.accel = self.power * (1.0*self.throttle - 1.7*self.brake) * (g/255.0) * tractionMultiplier
 
     if self.throttle == 0.0 and self.speed > 0:
@@ -316,15 +326,15 @@ class Car(pygame.sprite.Sprite):
       self.accelL = self.accelL * (1 + 1.3*abs(self.accel)/(1.7*self.power))
       self.speed = self.speed - abs(0.6*self.accel)
 
-    # DRIFT MECHANIC - Professor lerp formula 
+    # ── DRIFT MECHANIC - Professor lerp formula ──────────────────────────────
     # newXvel = alpha * P.x + (1 - alpha) * C.x
-    # P.x = forward speed (where car wants to go)
-    # C.x = current lateral speed (where car is sliding)
-    # alpha = 0.8 means 80% toward intended direction, 20% slide
+    # P.x  = forward speed (where the car wants to go)
+    # C.x  = current lateral speed (where the car is sliding)
+    # alpha = 0.65 → car keeps 35% of the slide for a visible real drift
+    # Old alpha was 0.8 → only 20% slide, felt like mild understeer not a drift
     if self.drifting:
-      ALPHA = 0.8
-      newXvel = ALPHA * self.speed + (1.0 - ALPHA) * self.speedL
-      self.speedL = newXvel
+      ALPHA = 0.65
+      self.speedL = ALPHA * self.speed + (1.0 - ALPHA) * self.speedL
 
     self.speedL = 0.2*self.speedL + self.accelL
 
@@ -388,8 +398,8 @@ class Car(pygame.sprite.Sprite):
     if self.accel < -0.005:
       self.slide = 2
 
-    # During a drift, show tire marks only when intensity is strong enough
-    if self.drifting and self.driftIntensity > 0.3:
+    # Tire marks appear during drift when intensity is above 0.2 (was 0.3 — too high, marks barely showed)
+    if self.drifting and self.driftIntensity > 0.2:
       self.slide = 2
 
   def doAccel(self):
