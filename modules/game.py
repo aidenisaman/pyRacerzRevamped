@@ -271,6 +271,18 @@ class Game:
                 popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
                 play.chrono = 0
 
+        # Manage Collisions
+        for play in self.listPlayer:
+          for play2 in self.listPlayer:
+            if play == play2:
+             continue
+           # Prevent collisions between cars on different bridge levels in desert tracks
+            if currentTrack.name.startswith("desert"):
+             # Only allow collision if both are on the bridge (80) or both are not
+              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
+               continue
+            if currentTrack.name.startswith("city"):
+              if (play.lastCheckpoint == 48) != (play2.lastCheckpoint == 48):
         # Manage Collisions — broad-phase spatial grid reduces candidate pairs.
         # Rebuild the grid each frame (O(n)), then only run the expensive
         # narrow-phase rect tests on pairs that share a grid cell.
@@ -355,7 +367,7 @@ class Game:
 
           # If there's something on the car (the car is in a tunnel), manage mask to hide the car
           # Specific code for desertf in which the car will be shown above overpass at checkpoint 5 (red=80), reverts when reaching checkpoint 6 (red=96)
-          if currentTrack.name.startswith("desert") and play.lastCheckpoint == 80:
+          if (currentTrack.name.startswith("desert") and play.lastCheckpoint == 80) or (currentTrack.name.startswith("city") and play.lastCheckpoint == 48):
             pass
           else:
             part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
