@@ -240,6 +240,44 @@ def getUnlockLevel():
   else:
     return 0
 
+class TextInput:
+  """Reusable single-line text-input helper.
+
+  Decouples key-handling from any specific menu class.  Call ``feed_key``
+  on each KEYDOWN event; it returns ``True`` when the text changed so the
+  caller knows to trigger a refresh.  ``render_text`` returns the display
+  string with a blinking-cursor ``_`` appended when the field is not full.
+
+  Supported keys: K_a–K_z (uppercased), K_0–K_9, K_BACKSPACE.
+  """
+
+  def __init__(self, max_length: int, initial: str = "") -> None:
+    self.max_length = max_length
+    self.text = initial[:max_length]
+
+  def feed_key(self, key) -> bool:
+    """Process a pygame key code. Returns True if the text changed."""
+    if key == K_BACKSPACE:
+      if self.text:
+        self.text = self.text[:-1]
+        return True
+    elif K_a <= key <= K_z:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key).upper()
+        return True
+    elif K_0 <= key <= K_9:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key)
+        return True
+    return False
+
+  def render_text(self) -> str:
+    """Return display string; appends '_' cursor when field is not full."""
+    if len(self.text) < self.max_length:
+      return self.text + "_"
+    return self.text
+
+
 def setUnlockLevel(lck):
 
   # Only change the unlock level if it's better than the actual one

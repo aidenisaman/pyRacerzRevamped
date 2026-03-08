@@ -28,6 +28,7 @@ import zlib
 from . import track
 from . import menu
 from . import misc
+from . import collision
 
 import sys
 import os
@@ -79,6 +80,8 @@ class Game:
 
       # Initialise clock
       clock = pygame.time.Clock()
+      # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
+      _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
 
       # Display player names and cars blinking...
@@ -268,62 +271,64 @@ class Game:
                 popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
                 play.chrono = 0
 
-        # Manage Collisions
-        for play in self.listPlayer:
-         for play2 in self.listPlayer:
-           if play == play2:
-             continue
-           # Prevent collisions between cars on different bridge levels in desert tracks
-           if currentTrack.name.startswith("desert"):
-             # Only allow collision if both are on the bridge (80) or both are not
-             if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
-               continue
-           playCollisionRects = []
-           play2CollisionRects = []
-           listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(0)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(1)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(2)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
-           listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
-           if listIndex != []:
-             playCollisionRects.append(3)
-             for idx in listIndex:
-               if idx not in play2CollisionRects:
-                 play2CollisionRects.append(idx)
+        # Manage Collisions — broad-phase spatial grid reduces candidate pairs.
+        # Rebuild the grid each frame (O(n)), then only run the expensive
+        # narrow-phase rect tests on pairs that share a grid cell.
+        _collision_grid.rebuild(self.listPlayer, get_rect=lambda p: p.car.rect)
+        for _pa, _pb in _collision_grid.candidate_pairs():
+          # Process both orderings so each car gets its own directional response.
+          for play, play2 in ((_pa, _pb), (_pb, _pa)):
+            # Prevent collisions between cars on different bridge levels in desert tracks
+            if currentTrack.name.startswith("desert"):
+              # Only allow collision if both are on the bridge (80) or both are not
+              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
+                continue
+            playCollisionRects = []
+            play2CollisionRects = []
+            listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(0)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(1)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(2)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
+            listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+            if listIndex != []:
+              playCollisionRects.append(3)
+              for idx in listIndex:
+                if idx not in play2CollisionRects:
+                  play2CollisionRects.append(idx)
 
-           playCollisionRects.sort()
-           play2CollisionRects.sort()
-           #if playCollisionRects != []:
-             #print playCollisionRects
-           if playCollisionRects == [0]:
-             play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
-           elif playCollisionRects == [1]:
-             play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
-           elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
-             play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
-             play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
-             play.car.newSpeed = 0
-           elif playCollisionRects != [] :
-             #TODO
-             #print "Strange Collision !!!"
-             #print playCollisionRects
-             play.car.newSpeed = 0
+            playCollisionRects.sort()
+            play2CollisionRects.sort()
+            #if playCollisionRects != []:
+              #print playCollisionRects
+            if playCollisionRects == [0]:
+              play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
+            elif playCollisionRects == [1]:
+              play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
+            elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
+              play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
+              play.car.newSpeed = 0
+            elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
+              play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
+              play.car.newSpeed = 0
+            elif playCollisionRects != [] :
+              #TODO
+              #print "Strange Collision !!!"
+              #print playCollisionRects
+              play.car.newSpeed = 0
         
         for play in self.listPlayer:
           #print play.name
@@ -497,25 +502,21 @@ class Game:
         
         waitMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "recording Replay...")
 
-        if select2 != None and select2 != "":
-          f = open(os.path.join("replays", select2 + ".rep"), "wb")
-
-          # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
-          f.write(str(misc.VERSION) + " " + currentTrack.name + " " + str(currentTrack.reverse) + " " + str(masterChrono) + " " + str(len(self.listPlayer)) + " ")
+        if select2 is not None and select2 != "":
+          # Build text header then write binary frame data
+          header = (
+            f"{misc.VERSION} {currentTrack.name} {currentTrack.reverse} "
+            f"{masterChrono} {len(self.listPlayer)} "
+          )
           for play in self.listPlayer:
-            f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
-          f.write("\n")
+            header += f"{play.name} {play.car.color} {play.car.level} "
+          header += "\n"
 
-          # Put the array into the Replay File
-          stringFile = ""
-          try:
-            while 1:
-              stringFile = stringFile + str(replayArray.pop(0)) + " "
-          except Exception:
-            pass
-          f.write(zlib.compress(stringFile))
-
-          f.close()
+          with open(os.path.join("replays", select2 + ".rep"), "wb") as f:
+            f.write(header.encode())
+            # Serialize frame array as raw binary (5 signed 16-bit ints per
+            # player per frame), then zlib-compress for compact storage.
+            f.write(zlib.compress(replayArray.tobytes()))
 
       self.computeScores(currentTrack)
 
