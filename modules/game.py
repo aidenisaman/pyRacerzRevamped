@@ -28,6 +28,7 @@ import zlib
 from . import track
 from . import menu
 from . import misc
+from . import collision
 
 import sys
 import os
@@ -79,6 +80,8 @@ class Game:
 
       # Initialise clock
       clock = pygame.time.Clock()
+      # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
+      _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
 
       # Display player names and cars blinking...
@@ -180,49 +183,14 @@ class Game:
               misc.stopMusic()
               return -1
             for play in self.listPlayer:
-              if play.__class__.__name__ == "HumanPlayer":
-                if event.key == play.keyAccel:
-                  play.keyAccelPressed = 1
-                if event.key == play.keyBrake:
-                  play.keyBrakePressed = 1
-                if event.key == play.keyLeft:
-                  play.keyLeftPressed = 1
-                if event.key == play.keyRight:
-                  play.keyRightPressed = 1
+              play.handle_keydown(event.key)
           elif event.type == KEYUP:
             for play in self.listPlayer:
-              if play.__class__.__name__ == "HumanPlayer":
-                if event.key == play.keyAccel:
-                  play.keyAccelPressed = 0
-                if event.key == play.keyBrake:
-                  play.keyBrakePressed = 0
-                if event.key == play.keyLeft:
-                  play.keyLeftPressed = 0
-                if event.key == play.keyRight:
-                  play.keyRightPressed = 0
+              play.handle_keyup(event.key)
 
-        # Make some modifications on the car commands
+        # Apply per-player control updates
         for play in self.listPlayer:
-
-          # Bot players need to compute
-          if play.__class__.__name__ == "RobotPlayer":
-            play.compute()
-
-          if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
-            if play.keyAccelPressed == 1:
-              play.car.doAccel()
-            else:
-              play.car.noAccel()
-            if play.keyBrakePressed == 1:
-              play.car.doBrake()
-            else:
-              play.car.noBrake()
-            if play.keyLeftPressed == 1:
-              play.car.doLeft()
-            if play.keyRightPressed == 1:
-              play.car.doRight()
-            if play.keyLeftPressed == 0 and play.keyRightPressed == 0:
-              play.car.noWheel()
+          play.update_controls()
 
         # TODO ? Manage Rect.union (oldRect and newRect of a car) to optimize !!!!
         # Append the old rect to the dirty Rects
@@ -315,6 +283,17 @@ class Game:
                continue
             if currentTrack.name.startswith("city"):
               if (play.lastCheckpoint == 48) != (play2.lastCheckpoint == 48):
+        # Manage Collisions — broad-phase spatial grid reduces candidate pairs.
+        # Rebuild the grid each frame (O(n)), then only run the expensive
+        # narrow-phase rect tests on pairs that share a grid cell.
+        _collision_grid.rebuild(self.listPlayer, get_rect=lambda p: p.car.rect)
+        for _pa, _pb in _collision_grid.candidate_pairs():
+          # Process both orderings so each car gets its own directional response.
+          for play, play2 in ((_pa, _pb), (_pb, _pa)):
+            # Prevent collisions between cars on different bridge levels in desert tracks
+            if currentTrack.name.startswith("desert"):
+              # Only allow collision if both are on the bridge (80) or both are not
+              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
                 continue
             playCollisionRects = []
             play2CollisionRects = []
@@ -535,25 +514,21 @@ class Game:
         
         waitMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "recording Replay...")
 
-        if select2 != None and select2 != "":
-          f = open(os.path.join("replays", select2 + ".rep"), "wb")
-
-          # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
-          f.write(str(misc.VERSION) + " " + currentTrack.name + " " + str(currentTrack.reverse) + " " + str(masterChrono) + " " + str(len(self.listPlayer)) + " ")
+        if select2 is not None and select2 != "":
+          # Build text header then write binary frame data
+          header = (
+            f"{misc.VERSION} {currentTrack.name} {currentTrack.reverse} "
+            f"{masterChrono} {len(self.listPlayer)} "
+          )
           for play in self.listPlayer:
-            f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
-          f.write("\n")
+            header += f"{play.name} {play.car.color} {play.car.level} "
+          header += "\n"
 
-          # Put the array into the Replay File
-          stringFile = ""
-          try:
-            while 1:
-              stringFile = stringFile + str(replayArray.pop(0)) + " "
-          except Exception:
-            pass
-          f.write(zlib.compress(stringFile))
-
-          f.close()
+          with open(os.path.join("replays", select2 + ".rep"), "wb") as f:
+            f.write(header.encode())
+            # Serialize frame array as raw binary (5 signed 16-bit ints per
+            # player per frame), then zlib-compress for compact storage.
+            f.write(zlib.compress(replayArray.tobytes()))
 
       self.computeScores(currentTrack)
 

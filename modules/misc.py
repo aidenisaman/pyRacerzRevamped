@@ -177,26 +177,29 @@ def addHiScore(track, player):
 
   # If the Level is not represented create it and put the Hi-scores
   if not confFile.has_option("hi " + track.name, "level" + str(level)):
-    h = sha1.new(str(track.name))
-    h.update(str("level" + str(level)))
-    h.update(player.name)
-    h.update(str(player.bestChrono))
+    h = sha1()
+    h.update(str(track.name).encode())
+    h.update(str("level" + str(level)).encode())
+    h.update(player.name.encode())
+    h.update(str(player.bestChrono).encode())
     fwrite = open(".pyRacerz.conf", "w+")
     confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
     confFile.write(fwrite)
     return 1
   else:
     hi = confFile.get("hi " + track.name, "level" + str(level)).split()
-    h = sha1.new(str(track.name))
-    h.update(str("level" + str(level)))
-    h.update(hi[0])
-    h.update(hi[1])
+    h = sha1()
+    h.update(str(track.name).encode())
+    h.update(str("level" + str(level)).encode())
+    h.update(hi[0].encode())
+    h.update(hi[1].encode())
     if hi[2] == h.hexdigest():
       if int(hi[1]) > player.bestChrono:
-        h = sha1.new(str(track.name))
-        h.update(str("level" + str(level)))
-        h.update(player.name)
-        h.update(str(player.bestChrono))
+        h = sha1()
+        h.update(str(track.name).encode())
+        h.update(str("level" + str(level)).encode())
+        h.update(player.name.encode())
+        h.update(str(player.bestChrono).encode())
         fwrite = open(".pyRacerz.conf", "w+")
         confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
         confFile.write(fwrite)
@@ -205,10 +208,11 @@ def addHiScore(track, player):
         return 0
     else:
       # If the HiScore is Corrupted, erase it
-      h = sha1.new(str(track.name))
-      h.update(str("level" + str(level)))
-      h.update(player.name)
-      h.update(str(player.bestChrono))
+      h = sha1()
+      h.update(str(track.name).encode())
+      h.update(str("level" + str(level)).encode())
+      h.update(player.name.encode())
+      h.update(str(player.bestChrono).encode())
       fwrite = open(".pyRacerz.conf", "w+")
       confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
       confFile.write(fwrite)
@@ -228,12 +232,51 @@ def getUnlockLevel():
     return 0
 
   key = confFile.get("unlockLevel", "key").split()
-  h = sha1.new("pyRacerz")
-  h.update(str(key[0]))
+  h = sha1()
+  h.update(str("pyRacerz").encode())
+  h.update(str(key[0]).encode())
   if h.hexdigest() == key[1]:
     return key[0]
   else:
     return 0
+
+class TextInput:
+  """Reusable single-line text-input helper.
+
+  Decouples key-handling from any specific menu class.  Call ``feed_key``
+  on each KEYDOWN event; it returns ``True`` when the text changed so the
+  caller knows to trigger a refresh.  ``render_text`` returns the display
+  string with a blinking-cursor ``_`` appended when the field is not full.
+
+  Supported keys: K_a–K_z (uppercased), K_0–K_9, K_BACKSPACE.
+  """
+
+  def __init__(self, max_length: int, initial: str = "") -> None:
+    self.max_length = max_length
+    self.text = initial[:max_length]
+
+  def feed_key(self, key) -> bool:
+    """Process a pygame key code. Returns True if the text changed."""
+    if key == K_BACKSPACE:
+      if self.text:
+        self.text = self.text[:-1]
+        return True
+    elif K_a <= key <= K_z:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key).upper()
+        return True
+    elif K_0 <= key <= K_9:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key)
+        return True
+    return False
+
+  def render_text(self) -> str:
+    """Return display string; appends '_' cursor when field is not full."""
+    if len(self.text) < self.max_length:
+      return self.text + "_"
+    return self.text
+
 
 def setUnlockLevel(lck):
 
@@ -255,8 +298,9 @@ def setUnlockLevel(lck):
     confFile.write(fwrite)
     confFile.read_file(open(".pyRacerz.conf", "r"))
 
-  h = sha1.new("pyRacerz")
-  h.update(str(lck))
+  h = sha1()
+  h.update(str("pyRacerz").encode())
+  h.update(str(lck).encode())
   fwrite = open(".pyRacerz.conf", "w+")
   confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())
   confFile.write(fwrite)
