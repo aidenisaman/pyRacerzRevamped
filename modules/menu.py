@@ -1066,6 +1066,11 @@ class NetworkLobbyMenu(Menu):
           "roster":     msg.get("roster", []),
         }
 
+      elif mtype == "finish" and not self._is_host:
+        # Host closed the lobby — leave gracefully
+        self._net.disconnect()
+        result = {"action": "leave"}
+
     if result:
       return result
     return "refresh" if changed else None

@@ -263,6 +263,7 @@ class NetworkServer:
     while self._running:
       try:
         sock, addr = self._sock.accept()
+        sock.settimeout(None)   # ensure accepted socket is in blocking mode
         conn = _Connection(sock, addr)
         with self._lock:
           self._clients.append(conn)
@@ -287,6 +288,10 @@ class NetworkClient:
     """Try to connect; returns True on success."""
     try:
       sock = socket.create_connection((self.host, self.port), timeout=timeout)
+      # create_connection leaves the socket with the connect-timeout still
+      # active.  Reset to blocking mode so the background _receiver thread
+      # never dies from a spurious socket.timeout during idle periods.
+      sock.settimeout(None)
       self._conn = _Connection(sock, (self.host, self.port))
       return True
     except Exception:
