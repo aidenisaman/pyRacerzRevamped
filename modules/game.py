@@ -10,7 +10,7 @@
 # pyRacerz is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# GNU General Public License for more details.x
 #
 # You should have received a copy of the GNU General Public License
 # along with pyRacerz; if not, write to the Free Software
@@ -42,6 +42,20 @@ HUD_X = 8
 HUD_Y = 8
 HUD_W = 160
 HUD_H = 88
+
+try:
+    _FNT    = pygame.font.SysFont("Arial", 13, bold=True)
+    _FNT_LG = pygame.font.SysFont("Arial", 15, bold=True)
+    _FNT_TITLE = pygame.font.SysFont("Arial", 48, bold=True)
+    _FNT_BTN   = pygame.font.SysFont("Arial", 26, bold=True)
+    _FNT_INFO  = pygame.font.SysFont("Arial", 14, bold=True)
+except Exception:
+    _FNT    = pygame.font.Font(None, 16)
+    _FNT_LG = pygame.font.Font(None, 18)
+    _FNT_TITLE = pygame.font.Font(None, 48)
+    _FNT_BTN   = pygame.font.Font(None, 28)
+    _FNT_INFO  = pygame.font.Font(None, 16)
+
 
 #  Utility helpers
 
@@ -81,18 +95,16 @@ def draw_rounded_rect(surface, color, rect, radius, width=0):
             pygame.draw.circle(surface, color, (cx, cy), r, width)
 
 
-#  Advanced HUD  
-
+#  Advanced HUD
 def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     """
     Draws the in-race HUD panel:
       • Race time
       • Lap counter  (Lap N / Total)
       • Current lap timer
-      • Best lap      (green when just beaten)
-      • Position      (gold when 1st)
+      • Best lap      (purple when just beaten)
       • Speed in km/h  (colour-coded)
-      • White flash animation when a new best lap is set
+      • Purple flash animation when a new best lap is set
     """
     bg = pygame.Surface((HUD_W, HUD_H), pygame.SRCALPHA)
     for row in range(HUD_H):
@@ -101,16 +113,8 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     screen.blit(bg, (HUD_X, HUD_Y))
 
     pygame.draw.rect(screen, (230, 0, 0), (HUD_X, HUD_Y, 4, HUD_H))
-
-    pygame.draw.rect(screen, (255, 255, 255), (HUD_X, HUD_Y,      HUD_W, 2))
-    pygame.draw.rect(screen, (80,  80,  80),  (HUD_X, HUD_Y+HUD_H-1, HUD_W, 1))
-
-    try:
-        fnt    = pygame.font.SysFont("Arial", 13, bold=True)
-        fnt_lg = pygame.font.SysFont("Arial", 15, bold=True)
-    except Exception:
-        fnt    = pygame.font.Font(None, 16)
-        fnt_lg = pygame.font.Font(None, 18)
+    pygame.draw.rect(screen, (255, 255, 255), (HUD_X, HUD_Y,          HUD_W, 2))
+    pygame.draw.rect(screen, (80,  80,  80),  (HUD_X, HUD_Y+HUD_H-1,  HUD_W, 1))
 
     pad = 12
     lh  = 19
@@ -118,9 +122,9 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     ty  = HUD_Y + 8
 
     # Race time + Lap counter
-    screen.blit(fnt.render("TIME  " + fmt_time(masterChrono), True, (180, 180, 180)), (tx, ty))
-    current_lap = min(player.nbLap + 1, maxLapNb)  # +1: show lap being driven; clamp on final lap
-    lap_surf = fnt_lg.render(f"LAP {current_lap}/{maxLapNb}", True, (230, 0, 0))
+    screen.blit(_FNT.render("TIME  " + fmt_time(masterChrono), True, (180, 180, 180)), (tx, ty))
+    current_lap = min(player.nbLap + 1, maxLapNb)
+    lap_surf = _FNT_LG.render(f"LAP {current_lap}/{maxLapNb}", True, (230, 0, 0))
     screen.blit(lap_surf, (HUD_X + HUD_W - lap_surf.get_width() - 8, ty))
     ty += lh + 1
 
@@ -129,7 +133,7 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     ty += 4
 
     # Lap time
-    screen.blit(fnt.render("LAP   " + fmt_time(player.chrono), True, (255, 255, 255)), (tx, ty))
+    screen.blit(_FNT.render("LAP   " + fmt_time(player.chrono), True, (255, 255, 255)), (tx, ty))
     ty += lh
 
     # Best lap
@@ -139,7 +143,7 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     else:
         best_col = (120, 120, 120)
         best_str = "----"
-    screen.blit(fnt.render("BEST  " + best_str, True, best_col), (tx, ty))
+    screen.blit(_FNT.render("BEST  " + best_str, True, best_col), (tx, ty))
     ty += lh
 
     # Speed
@@ -150,9 +154,9 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
         spd_col = (255, 165, 0)
     else:
         spd_col = (255, 255, 255)
-    screen.blit(fnt.render(f"SPD   {speed_val} km/h", True, spd_col), (tx, ty))
+    screen.blit(_FNT.render(f"SPD   {speed_val} km/h", True, spd_col), (tx, ty))
 
-    # Purple flash on new best lap 
+    # Purple flash on new best lap
     if lap_flash_timer > 0:
         alpha = min(180, lap_flash_timer * 7)
         flash = pygame.Surface((HUD_W, HUD_H), pygame.SRCALPHA)
@@ -160,13 +164,13 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
         screen.blit(flash, (HUD_X, HUD_Y))
 
 
-#  Advanced Minimap  
+#  Advanced Minimap
 
 def draw_minimap(screen, currentTrack, listPlayer, minimap_cache):
     """
     Draws the minimap:
       • Cached scaled track thumbnail
-      • Rounded gold border
+      • White border with red top bar
       • Pulsing white halo on player's car dot
       • Coloured dots for all cars
     """
@@ -179,7 +183,6 @@ def draw_minimap(screen, currentTrack, listPlayer, minimap_cache):
         minimap_cache[0] = pygame.transform.smoothscale(
             currentTrack.track, (MINIMAP_SIZE, MINIMAP_SIZE))
 
-    # Dark bg → track image
     bg = pygame.Surface((MINIMAP_SIZE, MINIMAP_SIZE), pygame.SRCALPHA)
     bg.fill((10, 10, 10, 200))
     screen.blit(bg, (mx, my))
@@ -191,7 +194,7 @@ def draw_minimap(screen, currentTrack, listPlayer, minimap_cache):
     tw = currentTrack.track.get_width()
     th = currentTrack.track.get_height()
     dot_colors = [(255, 60, 60), (60, 180, 255), (60, 255, 120), (255, 255, 60)]
-    pulse = (pygame.time.get_ticks() // 180) % 4   # 0-3 cycles → pulsing radius
+    pulse = (pygame.time.get_ticks() // 180) % 4
 
     for idx, play in enumerate(listPlayer):
         dx  = mx + int(play.car.x / tw * MINIMAP_SIZE)
@@ -199,11 +202,9 @@ def draw_minimap(screen, currentTrack, listPlayer, minimap_cache):
         col = dot_colors[idx % len(dot_colors)]
 
         if idx == 0:
-            # Pulsing white halo
             hr = 5 + pulse
             halo = pygame.Surface((hr*2+4, hr*2+4), pygame.SRCALPHA)
-            pygame.draw.circle(halo, (255, 255, 255, 90),
-                               (hr+2, hr+2), hr)
+            pygame.draw.circle(halo, (255, 255, 255, 90), (hr+2, hr+2), hr)
             screen.blit(halo, (dx - hr - 2, dy - hr - 2))
             pygame.draw.circle(screen, col, (dx, dy), 4)
             pygame.draw.circle(screen, (255, 255, 255), (dx, dy), 4, 1)
@@ -211,14 +212,12 @@ def draw_minimap(screen, currentTrack, listPlayer, minimap_cache):
             pygame.draw.circle(screen, col, (dx, dy), 3)
 
 
-#  Advanced Pause Menu  
-
+#  Advanced Pause Menu
 def draw_pause_menu(screen, player, masterChrono, slide_y):
-    """F1-style pause menu — dark carbon, red accents, no position stats."""
+    """F1-style pause menu — dark carbon, red accents."""
     sw = screen.get_width()
     sh = screen.get_height()
 
-    # Dark veil
     veil = pygame.Surface((sw, sh), pygame.SRCALPHA)
     veil.fill((0, 0, 0, 160))
     screen.blit(veil, (0, 0))
@@ -227,26 +226,15 @@ def draw_pause_menu(screen, player, masterChrono, slide_y):
     bx = (sw - box_w) // 2
     by = (sh - box_h) // 2 + slide_y
 
-    # Carbon-fiber gradient box
     box = pygame.Surface((box_w, box_h))
     for row in range(box_h):
         v = 20 + int(row / box_h * 15)
         pygame.draw.line(box, (v, v, v), (0, row), (box_w, row))
     screen.blit(box, (bx, by))
 
-    pygame.draw.rect(screen, (255, 255, 255), (bx,   by,   box_w,   box_h),   2)
-    pygame.draw.rect(screen, (230, 0,   0),   (bx,   by,   box_w,   5))
-    pygame.draw.rect(screen, (230, 0,   0),   (bx,   by+box_h-5, box_w, 5))
-
-    # Fonts
-    try:
-        title_fnt = pygame.font.SysFont("Arial", 48, bold=True)
-        btn_fnt   = pygame.font.SysFont("Arial", 26, bold=True)
-        info_fnt  = pygame.font.SysFont("Arial", 14, bold=True)
-    except Exception:
-        title_fnt = pygame.font.Font(None, 48)
-        btn_fnt   = pygame.font.Font(None, 28)
-        info_fnt  = pygame.font.Font(None, 16)
+    pygame.draw.rect(screen, (255, 255, 255), (bx, by,            box_w, box_h), 2)
+    pygame.draw.rect(screen, (230, 0,   0),   (bx, by,            box_w, 5))
+    pygame.draw.rect(screen, (230, 0,   0),   (bx, by+box_h-5,    box_w, 5))
 
     cx = bx + box_w // 2
 
@@ -256,14 +244,11 @@ def draw_pause_menu(screen, player, masterChrono, slide_y):
         screen.blit(sh_s, (centre_x - sh_s.get_width()//2 + offset, y + offset))
         screen.blit(tx_s, (centre_x - tx_s.get_width()//2, y))
 
-    # Title
-    shadow_blit(title_fnt, "PAUSED", (255, 255, 255), (80, 0, 0), cx, by + 18)
+    shadow_blit(_FNT_TITLE, "PAUSED", (255, 255, 255), (80, 0, 0), cx, by + 18)
 
-    # Thin white divider under title
     pygame.draw.line(screen, (255, 255, 255),
                      (bx + 40, by + 72), (bx + box_w - 40, by + 72), 1)
 
-    stats_fnt2 = info_fnt
     stats = [
         ("RACE TIME", fmt_time(masterChrono),  (180, 180, 180)),
         ("LAP  TIME", fmt_time(player.chrono), (255, 255, 255)),
@@ -273,12 +258,12 @@ def draw_pause_menu(screen, player, masterChrono, slide_y):
     ]
     sx = by + 78
     for label, val, val_col in stats:
-        lbl_s = info_fnt.render(label, True, (110, 110, 110))
-        val_s = info_fnt.render(val,   True, val_col)
+        lbl_s = _FNT_INFO.render(label, True, (110, 110, 110))
+        val_s = _FNT_INFO.render(val,   True, val_col)
         screen.blit(lbl_s, (bx + 30, sx))
         screen.blit(val_s, (bx + box_w - 30 - val_s.get_width(), sx))
         sx += 18
-    # Separator before buttons
+
     pygame.draw.rect(screen, (50, 50, 50), (bx + 20, sx + 2, box_w - 40, 1))
 
     buttons = [
@@ -291,29 +276,22 @@ def draw_pause_menu(screen, player, masterChrono, slide_y):
     sy    = sx + 10
 
     for key, label, key_col, lbl_col in buttons:
-        # Button bg
         btn_surf = pygame.Surface((btn_w, btn_h))
         for row in range(btn_h):
             v = 35 + int(row / btn_h * 20)
             pygame.draw.line(btn_surf, (v, v, v), (0, row), (btn_w, row))
         screen.blit(btn_surf, (btn_x, sy))
 
-        # White border
         pygame.draw.rect(screen, (80, 80, 80), (btn_x, sy, btn_w, btn_h), 1)
-
-        # Red left accent on button
         pygame.draw.rect(screen, key_col, (btn_x, sy, 4, btn_h))
 
-        # Key letter
-        key_surf = btn_fnt.render(key, True, key_col)
+        key_surf = _FNT_BTN.render(key, True, key_col)
         screen.blit(key_surf, (btn_x + 14, sy + (btn_h - key_surf.get_height())//2))
 
-        # Separator
         pygame.draw.line(screen, (60, 60, 60),
                          (btn_x + 38, sy + 6), (btn_x + 38, sy + btn_h - 6), 1)
 
-        # Label
-        lbl_surf = btn_fnt.render(label, True, lbl_col)
+        lbl_surf = _FNT_BTN.render(label, True, lbl_col)
         screen.blit(lbl_surf, (btn_x + 50, sy + (btn_h - lbl_surf.get_height())//2))
 
         sy += btn_h + btn_gap
@@ -334,6 +312,14 @@ class Game:
                 or self.listPlayer is None or self.maxLapNb == -1):
             print("Incomplete game")
             return
+
+        restart = True
+        while restart:
+            restart = False
+            self._run_race()
+
+    def _run_race(self):
+        """Inner race loop — extracted so restart uses a loop not recursion."""
 
         for currentTrackName in self.listTrackName:
             try:
@@ -388,15 +374,15 @@ class Game:
             raceFinish      = 0
             masterChrono    = 0
             paused          = False
-            slide_y         = 60    
-            lap_flash_timer = 0     
+            slide_y         = 60
+            lap_flash_timer = 0
             minimap_cache   = [None]
 
             for play in self.listPlayer:
-                play.bestChrono  = 999999
-                play.chrono      = 0
-                play.nbLap       = 0
-                play.raceFinish  = 0
+                play.bestChrono = 999999
+                play.chrono     = 0
+                play.nbLap      = 0
+                play.raceFinish = 0
 
             replayArray = array.array("h")
 
@@ -454,10 +440,13 @@ class Game:
                                 misc.screen.blit(currentTrack.track, (0, 0))
                                 pygame.display.flip()
                             elif event.key == K_t:
-                                return self.play()
+                                misc.stopMusic()
+                                self._restart_requested = True
+                                return
                             elif event.key == K_q:
                                 misc.stopMusic()
                                 return
+
                         else:
                             for play in self.listPlayer:
                                 if play.__class__.__name__ == "HumanPlayer":
@@ -474,6 +463,8 @@ class Game:
                                 if event.key == play.keyLeft:   play.keyLeftPressed  = 0
                                 if event.key == play.keyRight:  play.keyRightPressed = 0
 
+                # ── Pause ──
+                #  so the flip at the bottom of the loop never runs while paused
                 if paused:
                     if slide_y > 0:
                         slide_y = max(0, slide_y - 6)
@@ -484,9 +475,9 @@ class Game:
                              self.maxLapNb, lap_flash_timer)
                     draw_minimap(misc.screen, currentTrack, self.listPlayer, minimap_cache)
                     draw_pause_menu(misc.screen, self.listPlayer[0], masterChrono, slide_y)
-                    pygame.display.flip()
+                    pygame.display.flip()   # only flip here when paused
                     clock.tick(60)
-                    continue
+                    continue                
 
                 # ── Car controls ──
                 for play in self.listPlayer:
@@ -515,7 +506,6 @@ class Game:
 
                     color = currentTrack.trackF.get_at((int(play.car.x), int(play.car.y)))
                     r = color[0]
-                    # Store real-time track progress (pixel color = checkpoint zone)
 
                     if currentTrack.reverse == 0 and play.raceFinish == 0:
                         if r == play.lastCheckpoint + 16:
@@ -684,7 +674,7 @@ class Game:
                 if lap_flash_timer > 0:
                     lap_flash_timer -= 1
 
-                # HUD + Minimap 
+                # HUD + Minimap
                 draw_hud(misc.screen, self.listPlayer[0], masterChrono,
                          self.maxLapNb, lap_flash_timer)
                 draw_minimap(misc.screen, currentTrack, self.listPlayer, minimap_cache)
@@ -703,7 +693,7 @@ class Game:
                         l.append(tRect.__copy__())
                     else:
                         nbFrame += 1
-                    pygame.display.flip()
+                    pygame.display.flip()   
                     i = 0
                     l = []
                 else:

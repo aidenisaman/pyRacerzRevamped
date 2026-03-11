@@ -33,7 +33,7 @@ class Car(pygame.sprite.Sprite):
     imageLight = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + "B.png")).convert_alpha()
     
     # Car size scaling
-    self.scale = 1.5   # car size control (ONLY CAR)
+    self.scale = 1.5  
     
     self.sprite = pygame.sprite.RenderPlain(self)
 
@@ -365,10 +365,7 @@ class Car(pygame.sprite.Sprite):
     self.rect.move_ip(self.movepos)
 
     if self.rect != (int(self.x-self.sizeRect/2), int(self.y-self.sizeRect/2), self.sizeRect, self.sizeRect):
-      print("PROBLEM")
-      print(self.rect)
-      print(self.x)
-      print(self.y)
+      pass
 
     self.slide = 0
     # Compute tires slide
