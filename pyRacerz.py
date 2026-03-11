@@ -373,10 +373,8 @@ def main():
         cli = network.NetworkClient(ip)
         connecting = menu.SimpleTitleOnlyMenu(
           misc.titleFont, "Connecting to " + ip + "...")
-        connecting.refresh()
         if not cli.connect():
           fail = menu.SimpleTitleOnlyMenu(misc.titleFont, "Cannot connect!")
-          fail.refresh()
           misc.wait4Key()
           continue
 
