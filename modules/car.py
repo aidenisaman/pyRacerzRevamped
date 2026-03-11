@@ -245,7 +245,7 @@ class Car(pygame.sprite.Sprite):
     DRIFT_STEER_THRESHOLD = 0.40   # triggers at 40% of full steer input
 
     speedRatio = self.speed / self.maxSpeed if self.maxSpeed > 0 else 0
-    steerRatio = abs(self.angleW)
+    steerRatio = min(abs(self.angleW), 1.0)  
 
     speedExcess = max(0.0, (speedRatio - DRIFT_SPEED_THRESHOLD) / (1.0 - DRIFT_SPEED_THRESHOLD))
     steerExcess = max(0.0, (steerRatio - DRIFT_STEER_THRESHOLD) / (1.0 - DRIFT_STEER_THRESHOLD))
@@ -253,7 +253,6 @@ class Car(pygame.sprite.Sprite):
     targetDriftIntensity = speedExcess * steerExcess
 
     # Drift builds quickly (0.25) and fades slowly (0.88) for a natural feel.
-    # Old values (0.15 / 0.85) made drift feel delayed and weak.
     if targetDriftIntensity > self.driftIntensity:
       self.driftIntensity = 0.75 * self.driftIntensity + 0.25 * targetDriftIntensity  # fast build
     else:
@@ -261,7 +260,7 @@ class Car(pygame.sprite.Sprite):
 
     self.drifting = self.driftIntensity > 0.05
 
-    # Traction drops by 35% at full drift intensity (was 25% — too little grip loss)
+    # Traction drops by 35% at full drift intensity 
     DRIFT_TRACTION_REDUCTION = 0.35
     tractionMultiplier = 1.0 - (self.driftIntensity * DRIFT_TRACTION_REDUCTION)
 
@@ -334,7 +333,8 @@ class Car(pygame.sprite.Sprite):
     # Old alpha was 0.8 → only 20% slide, felt like mild understeer not a drift
     if self.drifting:
       ALPHA = 0.65
-      self.speedL = ALPHA * self.speed + (1.0 - ALPHA) * self.speedL
+      # Target is 0.0 so lateral slip decays naturally 
+      self.speedL = ALPHA * 0.0 + (1.0 - ALPHA) * self.speedL
 
     self.speedL = 0.2*self.speedL + self.accelL
 
@@ -386,7 +386,7 @@ class Car(pygame.sprite.Sprite):
     self.rect.move_ip(self.movepos)
 
     if self.rect != (int(self.x-self.sizeRect/2), int(self.y-self.sizeRect/2), self.sizeRect, self.sizeRect):
-      print("PROBLEM")
+      pass
       print(self.rect)
       print(self.x)
       print(self.y)
@@ -398,7 +398,7 @@ class Car(pygame.sprite.Sprite):
     if self.accel < -0.005:
       self.slide = 2
 
-    # Tire marks appear during drift when intensity is above 0.2 (was 0.3 — too high, marks barely showed)
+    # Tire marks appear during drift when intensity is above 0.2
     if self.drifting and self.driftIntensity > 0.2:
       self.slide = 2
 
