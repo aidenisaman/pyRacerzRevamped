@@ -240,6 +240,10 @@ class NetworkHostRace:
 
       if i == 1:
         pygame.display.update(l)
+        # Also push the chat region which is not tracked in dirty rects
+        chat_rect = pygame.Rect(0, _chat_y(), misc.screen.get_width(),
+                                misc.screen.get_height() - _chat_y())
+        pygame.display.update(chat_rect)
         i = 0
         l = []
       else:
@@ -319,8 +323,6 @@ class NetworkWatchRace:
     misc.screen.blit(hint_surf, (misc.screen.get_width() - hint_surf.get_width() - 4, 4))
     pygame.display.flip()
 
-    l       = []
-    i       = 0
     running = True
 
     while running:
@@ -381,16 +383,15 @@ class NetworkWatchRace:
         elif mtype == "finish":
           running = False
 
-      # Clear old position rects and draw all remote cars
+      # Erase old car positions, then draw all cars at current positions
       for rp in remote_cars.values():
         car = rp.car
-        if car.ox != 0:
+        if car.ox != 0 or car.oy != 0:
           old_r = pygame.Rect(
             int(car.ox - car.sizeRect / 2),
             int(car.oy - car.sizeRect / 2),
             car.sizeRect, car.sizeRect)
           misc.screen.blit(ct.track, old_r, old_r)
-          l.append(old_r)
 
       for rp in remote_cars.values():
         car = rp.car
@@ -398,21 +399,14 @@ class NetworkWatchRace:
           car.image = car.cars[int((256.0 * car.angle / 2.0 / math.pi) % 256)]
         else:
           car.image = car.cars2[int((256.0 * car.angle / 2.0 / math.pi) % 256)]
-        l.append(car.rect.__copy__())
         car.sprite.draw(misc.screen)
 
-      # Chat overlay + hint
+      # Chat overlay + hint — drawn last so they appear on top of everything
       _draw_chat_overlay(chat_log, chat_input.render_text() if is_typing else None)
       misc.screen.blit(hint_surf, (misc.screen.get_width() - hint_surf.get_width() - 4, 4))
 
-      if i == 1:
-        pygame.display.update(l)
-        i = 0
-        l = []
-      else:
-        i += 1
-
-      clock.tick(100)
+      pygame.display.flip()
+      clock.tick(60)
 
     # Race over banner
     misc.screen.blit(ct.track, (0, 0))
