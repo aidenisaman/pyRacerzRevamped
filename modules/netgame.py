@@ -190,6 +190,7 @@ class NetworkHostRace:
         "br": 1 if play.car.brake > 0 else 0,
         "sl": play.car.slide,
         "bl": play.car.blink,
+        "cp": play.lastCheckpoint,
       })
 
       # Receive messages from clients
@@ -313,6 +314,8 @@ class NetworkWatchRace:
       rp = player_mod.ReplayPlayer(info["name"], info["color"], info["level"])
       rp.play(ct)
       remote_cars[info["pid"]] = rp
+    # pid → lastCheckpoint, used for tunnel-mask logic (e.g. desert overpass)
+    car_checkpoints = {}
     clock      = pygame.time.Clock()
     chat_log   = []
     chat_input = misc.TextInput(50, allow_space=True)
@@ -378,6 +381,7 @@ class NetworkWatchRace:
           car.movepos[0] = int(car.x) - int(car.ox)
           car.movepos[1] = int(car.y) - int(car.oy)
           car.rect.move_ip(car.movepos)
+          car_checkpoints[pid] = msg.get("cp", car_checkpoints.get(pid, 0))
         elif mtype == "chat":
           chat_log.append(msg.get("sender", "?") + ": " + msg.get("text", ""))
         elif mtype == "finish":
@@ -393,13 +397,35 @@ class NetworkWatchRace:
             car.sizeRect, car.sizeRect)
           misc.screen.blit(ct.track, old_r, old_r)
 
-      for rp in remote_cars.values():
+      ct.track.lock()
+      for pid, rp in remote_cars.items():
         car = rp.car
         if car.brake == 0:
-          car.image = car.cars[int((256.0 * car.angle / 2.0 / math.pi) % 256)]
+          car.image = car.cars[int((256.0 * car.angle / 2.0 / math.pi) % 256)].copy()
         else:
-          car.image = car.cars2[int((256.0 * car.angle / 2.0 / math.pi) % 256)]
+          car.image = car.cars2[int((256.0 * car.angle / 2.0 / math.pi) % 256)].copy()
+
+        # Apply tunnel/underpass mask from trackF so underpasses render correctly
+        # Skip masking for desert overpass zone (checkpoint 80) where car is on top
+        last_cp = car_checkpoints.get(pid, 0)
+        if not (ct.name.startswith("desert") and last_cp == 80):
+          part = pygame.Surface((car.sizeRect, car.sizeRect), HWSURFACE, 24).convert()
+          part.blit(ct.trackF, (0, 0),
+            (car.x - car.sizeRect / 2,
+             car.y - car.sizeRect / 2,
+             car.sizeRect, car.sizeRect))
+          partArray = pygame.surfarray.array2d(part)
+          aX = 0
+          for arrayX in partArray:
+            aY = 0
+            for col in arrayX:
+              if col % 256 != 0:
+                car.image.set_at((aX, aY), (255, 255, 255, 0))
+              aY += 1
+            aX += 1
+
         car.sprite.draw(misc.screen)
+      ct.track.unlock()
 
       # Chat overlay + hint — drawn last so they appear on top of everything
       _draw_chat_overlay(chat_log, chat_input.render_text() if is_typing else None)
