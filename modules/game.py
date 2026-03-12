@@ -28,7 +28,6 @@ import zlib
 from . import track
 from . import menu
 from . import misc
-from . import collision
 
 import sys
 import os
