@@ -387,9 +387,7 @@ class Car(pygame.sprite.Sprite):
 
     if self.rect != (int(self.x-self.sizeRect/2), int(self.y-self.sizeRect/2), self.sizeRect, self.sizeRect):
       pass
-      print(self.rect)
-      print(self.x)
-      print(self.y)
+      
 
     self.slide = 0
     # Compute tires slide
