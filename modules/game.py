@@ -42,18 +42,28 @@ HUD_Y = 8
 HUD_W = 160
 HUD_H = 88
 
-try:
-    _FNT       = pygame.font.SysFont("Arial", 13, bold=True)
-    _FNT_LG    = pygame.font.SysFont("Arial", 15, bold=True)
-    _FNT_TITLE = pygame.font.SysFont("Arial", 48, bold=True)
-    _FNT_BTN   = pygame.font.SysFont("Arial", 26, bold=True)
-    _FNT_INFO  = pygame.font.SysFont("Arial", 14, bold=True)
-except Exception:
-    _FNT       = pygame.font.Font(None, 16)
-    _FNT_LG    = pygame.font.Font(None, 18)
-    _FNT_TITLE = pygame.font.Font(None, 48)
-    _FNT_BTN   = pygame.font.Font(None, 28)
-    _FNT_INFO  = pygame.font.Font(None, 16)
+_FNT       = None
+_FNT_LG    = None
+_FNT_TITLE = None
+_FNT_BTN   = None
+_FNT_INFO  = None
+
+def _init_fonts():
+    global _FNT, _FNT_LG, _FNT_TITLE, _FNT_BTN, _FNT_INFO
+    if _FNT is not None:
+        return
+    try:
+        _FNT       = pygame.font.SysFont("Arial", 13, bold=True)
+        _FNT_LG    = pygame.font.SysFont("Arial", 15, bold=True)
+        _FNT_TITLE = pygame.font.SysFont("Arial", 48, bold=True)
+        _FNT_BTN   = pygame.font.SysFont("Arial", 26, bold=True)
+        _FNT_INFO  = pygame.font.SysFont("Arial", 14, bold=True)
+    except Exception:
+        _FNT       = pygame.font.Font(None, 16)
+        _FNT_LG    = pygame.font.Font(None, 18)
+        _FNT_TITLE = pygame.font.Font(None, 48)
+        _FNT_BTN   = pygame.font.Font(None, 28)
+        _FNT_INFO  = pygame.font.Font(None, 16)
 
 
 def is_human(play):
@@ -65,8 +75,6 @@ def is_robot(play):
 def is_human_or_robot(play):
     return is_human(play) or is_robot(play)
 
-
-#  Utility helpers
 
 def fmt_time(t):
     if t <= 0 or t >= 999999:
@@ -100,8 +108,6 @@ def draw_rounded_rect(surface, color, rect, radius, width=0):
         for cx, cy in [(x+r, y+r), (x+w-r, y+r), (x+r, y+h-r), (x+w-r, y+h-r)]:
             pygame.draw.circle(surface, color, (cx, cy), r, width)
 
-
-#  Advanced HUD
 
 def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     bg = pygame.Surface((HUD_W, HUD_H), pygame.SRCALPHA)
@@ -156,8 +162,6 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
         screen.blit(flash, (HUD_X, HUD_Y))
 
 
-#  Advanced Minimap
-
 def draw_minimap(screen, currentTrack, listPlayer, minimap_cache, minimap_pos):
     mx, my = minimap_pos
 
@@ -193,8 +197,6 @@ def draw_minimap(screen, currentTrack, listPlayer, minimap_cache, minimap_pos):
         else:
             pygame.draw.circle(screen, col, (dx, dy), 3)
 
-
-#  Advanced Pause Menu
 
 def draw_pause_menu(screen, player, masterChrono, slide_y):
     sw = screen.get_width()
@@ -294,7 +296,7 @@ class Game:
             self._run_race()
 
     def _run_race(self):
-        """Inner race loop — no recursion, restart handled by loop in play()."""
+        _init_fonts()
 
         for currentTrackName in self.listTrackName:
             try:
@@ -305,7 +307,6 @@ class Game:
 
             misc.startRandomMusic()
 
-            # FIX 13: minimap_pos is a local variable — not a global
             minimap_pos = (misc.screen.get_width() - MINIMAP_SIZE - 6, 6)
 
             if currentTrackName == self.listTrackName[0]:
@@ -400,7 +401,6 @@ class Game:
                         sys.exit(0)
 
                     elif event.type == KEYDOWN:
-                        # P key toggles pause
                         if event.key == K_ESCAPE:
                             misc.stopMusic()
                             return
@@ -430,7 +430,6 @@ class Game:
                                     if event.key == play.keyRight:  play.keyRightPressed = 1
 
                     elif event.type == KEYUP:
-                        # FIX 11: use is_human() helper
                         for play in self.listPlayer:
                             if is_human(play):
                                 if event.key == play.keyAccel:  play.keyAccelPressed = 0
@@ -679,7 +678,6 @@ class Game:
                         val += 10
                     val += play.car.slide
                     replayArray.append(val)
-                    # FIX 11: use is_human_or_robot() helper
                     if is_human_or_robot(play):
                         val = (play.keyAccelPressed*1000 + play.keyBrakePressed*100
                                + play.keyLeftPressed*10  + play.keyRightPressed)
