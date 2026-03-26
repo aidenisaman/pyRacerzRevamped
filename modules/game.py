@@ -83,6 +83,11 @@ class Game:
       # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
       _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
+      # Let AI players inspect the race roster when using new architecture.
+      for play in self.listPlayer:
+        if hasattr(play, "set_race_context"):
+          play.set_race_context(self.listPlayer)
+
 
       # Display player names and cars blinking...
       for i in range(0, 4):

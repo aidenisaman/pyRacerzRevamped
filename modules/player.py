@@ -24,6 +24,9 @@ from . import misc
 
 import random
 import math
+import os
+
+from .ai_architecture import BoidsAIRuntime
 
 class Player:
   '''Virtual class for any pyRacerz player'''
@@ -155,6 +158,14 @@ class RobotPlayer(Player):
     self.keyBrakePressed = 0
     self.keyLeftPressed = 0
     self.keyRightPressed = 0
+
+    # Opt-in switch so architecture can ship without changing gameplay yet.
+    self.useBoidsAI = os.environ.get("PYRACERZ_USE_BOIDS_AI", "0") == "1"
+    self.aiRuntime = BoidsAIRuntime(level)
+    self.racePlayers = [self]
+
+  def set_race_context(self, listPlayers):
+    self.racePlayers = listPlayers
 
   def play(self, track, rank):
     self.keyAccelPressed = 0
@@ -317,6 +328,10 @@ class RobotPlayer(Player):
       self.keyBrakePressed = 0
 
   def update_controls(self):
+    if self.useBoidsAI:
+      self.aiRuntime.step(self, self.racePlayers)
+      return
+
     self.compute()
     if self.keyAccelPressed == 1:
       self.car.doAccel()
