@@ -711,19 +711,14 @@ class Game:
 
                 if select2 not in (None, ""):
                     f = open(os.path.join("replays", select2 + ".rep"), "wb")
-                    f.write(str(misc.VERSION) + " " + currentTrack.name + " "
+                    header = (str(misc.VERSION) + " " + currentTrack.name + " "
                             + str(currentTrack.reverse) + " " + str(masterChrono)
                             + " " + str(len(self.listPlayer)) + " ")
                     for play in self.listPlayer:
-                        f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
-                    f.write("\n")
-                    stringFile = ""
-                    try:
-                        while True:
-                            stringFile += str(replayArray.pop(0)) + " "
-                    except Exception:
-                        pass
-                    f.write(zlib.compress(stringFile))
+                        header += play.name + " " + str(play.car.color) + " " + str(play.car.level) + " "
+                    header += "\n"
+                    f.write(header.encode())
+                    f.write(zlib.compress(replayArray.tobytes()))
                     f.close()
 
             self.computeScores(currentTrack)
