@@ -39,29 +39,31 @@ class Replay:
     self.repFile = repFile
 
     try:
-      f = open(self.repFile, "rb")
+      with open(self.repFile, "rb") as f:
+        header = f.readline().decode()
+        stringList = header.split()
+        self.currentTrack = track.Track(stringList[1], int(stringList[2]))
 
-      string = f.readline()
-      stringList = string.split()
-      self.currentTrack = track.Track(stringList[1], int(stringList[2]))
+        self.nbEnreg = int(stringList[3])
 
-      self.nbEnreg = int(stringList[3])
+        nbPlayer = int(stringList[4])
 
-      nbPlayer = int(stringList[4])
+        self.listPlayer = []
+        for i in range(0, nbPlayer):
+          self.listPlayer.append(player.ReplayPlayer(stringList[5+3*i], int(stringList[5+3*i+1]), int(stringList[5+3*i+2])))
 
-      self.listPlayer = []
-      for i in range(0, nbPlayer):
-        self.listPlayer.append(player.ReplayPlayer(stringList[5+3*i], int(stringList[5+3*i+1]), int(stringList[5+3*i+2])))
-
-      self.replayArray = array.array("h")
-
-      # Put the datas in the array
-      stringFile = zlib.decompress(f.read())
-      stringFileList = stringFile.split()
-      for elem in stringFileList:
-        self.replayArray.append(int(elem))
-
-      f.close()
+        # Binary frame data: 5 signed 16-bit ints per player per frame,
+        # zlib-compressed.  Falls back to the legacy space-separated text
+        # format for old .rep files.
+        raw = zlib.decompress(f.read())
+        self.replayArray = array.array("h")
+        try:
+          self.replayArray.frombytes(raw)
+        except Exception:
+          # Legacy format: space-separated integer strings
+          for elem in raw.split():
+            self.replayArray.append(int(elem))
+        self._replay_idx = 0
 
     except Exception as e:
       errorMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "cannot Load Replay !")
@@ -69,6 +71,12 @@ class Replay:
       self.listPlayer = None
       print(e)
       return
+
+  def _pop(self) -> int:
+    """Return the next replay value by index (O(1)), advancing the pointer."""
+    val = self.replayArray[self._replay_idx]
+    self._replay_idx += 1
+    return val
 
   def play(self):
 
@@ -141,11 +149,11 @@ class Replay:
       for play in self.listPlayer:
         play.car.ox = play.car.x
         play.car.oy = play.car.y
-        play.car.x = self.replayArray.pop(0)*misc.zoom
-        play.car.y = self.replayArray.pop(0)*misc.zoom
+        play.car.x = self._pop()*misc.zoom
+        play.car.y = self._pop()*misc.zoom
         play.car.oldAngle = play.car.angle
-        play.car.angle = self.replayArray.pop(0)/1000.0
-        val = self.replayArray.pop(0)
+        play.car.angle = self._pop()/1000.0
+        val = self._pop()
         if val >= 100:
           play.car.blink = 1
           val = val - 100
@@ -159,7 +167,7 @@ class Replay:
 
         play.car.slide = val
 
-        nothing = self.replayArray.pop(0)
+        self._pop()  # key-state field (not needed for playback)
 
         # Move the car
         play.car.movepos[0]=int(play.car.x) - int(play.car.ox)
