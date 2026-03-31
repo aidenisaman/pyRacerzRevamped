@@ -15,30 +15,40 @@ class AIController:
 
     desired_heading = math.atan2(total[1], total[0]) if (abs(total[0]) + abs(total[1])) > 1e-9 else car.angle
     steer_error = _angle_diff(desired_heading, car.angle)
-    steer_raw = clamp(steer_error / (math.pi / 3.0), -1.0, 1.0)
+    steer_raw = clamp(steer_error / (math.pi / 3.0), -profile.max_steer_aggression, profile.max_steer_aggression)
 
     # Smooth steering to avoid twitching.
     alpha = clamp(profile.reaction_smoothing, 0.0, 1.0)
     steer = runtime_state.smoothed_steer * alpha + steer_raw * (1.0 - alpha)
     runtime_state.smoothed_steer = steer
 
-    target_speed = _target_speed(bot_player, snapshot, profile)
+    target_speed = _target_speed(bot_player, snapshot, profile, runtime_state)
     speed_error = target_speed - car.speed
 
     if runtime_state.state == BehaviorState.RECOVER:
-      # Reverse/slow-turn behavior for now.
-      return ControlCommand(throttle=0.0, brake=0.6, steer=steer)
+      # Reverse briefly if strongly off-road, else crawl forward while re-aligning.
+      if snapshot.offroad_ratio_local > 0.55 and car.speed < 0.7:
+        return ControlCommand(throttle=0.0, brake=1.0, steer=steer)
+      return ControlCommand(throttle=0.35, brake=0.0, steer=steer)
 
     throttle = 0.0
     brake = 0.0
     if speed_error > 0.2:
-      throttle = clamp(0.3 + speed_error * 0.2, 0.0, 1.0)
+      throttle = clamp(0.25 + speed_error * 0.22, 0.0, 1.0)
     elif speed_error < -0.2:
-      brake = clamp(0.2 + (-speed_error) * 0.25, 0.0, 1.0)
+      brake = clamp(0.12 + (-speed_error) * 0.30, 0.0, 1.0)
 
     # Dense packs should brake slightly earlier.
     brake += clamp(snapshot.neighbors_in_radius * profile.crowding_brake_gain * 0.05, 0.0, 0.4)
+
+    if runtime_state.state == BehaviorState.AVOID_COLLISION:
+      brake = max(brake, 0.35)
+      throttle *= 0.6
+    elif runtime_state.state == BehaviorState.OVERTAKE_BIAS:
+      throttle = min(1.0, throttle + 0.12)
+
     brake = clamp(brake, 0.0, 1.0)
+    throttle = clamp(throttle, 0.0, 1.0)
 
     return ControlCommand(throttle=throttle, brake=brake, steer=steer)
 
@@ -74,18 +84,25 @@ class CommandApplier:
       bot_player.keyRightPressed = 0
 
 
-def _target_speed(bot_player, snapshot, profile):
+def _target_speed(bot_player, snapshot, profile, runtime_state):
   speed_cap = bot_player.car.maxSpeed
 
   # Curvature and wall proximity reduce target speed.
-  curvature_penalty = min(abs(snapshot.curvature_ahead) * 0.5, 0.5)
+  curvature_penalty = min(abs(snapshot.curvature_ahead) * 10.0, 0.55)
   wall_penalty = 0.0
   if snapshot.distance_to_wall_ahead < 100.0:
     wall_penalty = (100.0 - max(snapshot.distance_to_wall_ahead, 0.0)) / 100.0
 
-  target = speed_cap * (1.0 - curvature_penalty * 0.6 - wall_penalty * 0.5)
+  target = speed_cap * (1.0 - curvature_penalty * 0.7 - wall_penalty * 0.55)
   if snapshot.offroad_ratio_local > 0.0:
     target *= 0.75
+
+  if runtime_state.state == BehaviorState.AVOID_COLLISION:
+    target *= 0.75
+  elif runtime_state.state == BehaviorState.RECOVER:
+    target = min(target, max(0.7, speed_cap * 0.35))
+  elif runtime_state.state == BehaviorState.OVERTAKE_BIAS:
+    target = min(speed_cap, target * 1.08)
 
   return clamp(target, 0.6, speed_cap)
 

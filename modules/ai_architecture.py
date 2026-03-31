@@ -30,7 +30,7 @@ class BoidsAIRuntime:
 
   def step(self, bot_player, all_players):
     track_model = self.track_cache.get_for_track(bot_player.car.track)
-    snapshot = self.perception.build_snapshot(bot_player, all_players, track_model, self.profile)
+    snapshot = self.perception.build_snapshot(bot_player, all_players, track_model, self.runtime_state, self.profile)
     self.runtime_state.recent_progress = abs(bot_player.car.speed)
 
     self.behavior.update_state(self.runtime_state, snapshot, self.profile)

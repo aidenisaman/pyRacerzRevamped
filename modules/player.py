@@ -159,8 +159,8 @@ class RobotPlayer(Player):
     self.keyLeftPressed = 0
     self.keyRightPressed = 0
 
-    # Opt-in switch so architecture can ship without changing gameplay yet.
-    self.useBoidsAI = os.environ.get("PYRACERZ_USE_BOIDS_AI", "0") == "1"
+    # New AI is now default; keep legacy fallback for debugging/regression checks.
+    self.useBoidsAI = os.environ.get("PYRACERZ_USE_LEGACY_AI", "0") != "1"
     self.aiRuntime = BoidsAIRuntime(level)
     self.racePlayers = [self]
 
