@@ -280,9 +280,10 @@ class Game:
             if currentTrack.name.startswith("desert"):
              # Only allow collision if both are on the bridge (80) or both are not
               if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
-               continue
+                continue
             if currentTrack.name.startswith("city"):
               if (play.lastCheckpoint == 48) != (play2.lastCheckpoint == 48):
+                continue
         # Manage Collisions — broad-phase spatial grid reduces candidate pairs.
         # Rebuild the grid each frame (O(n)), then only run the expensive
         # narrow-phase rect tests on pairs that share a grid cell.
