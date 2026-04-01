@@ -1,5 +1,5 @@
 import math
-
+#Slow down each command input to possibably help with strange descisions and getting lost/stuck.
 from .ai_types import BehaviorState
 from .ai_types import ControlCommand
 

@@ -12,3 +12,6 @@
 - Make the game RPM compatible (with datas in user home...)
 - Make a Windows .exe
 -Make care sprites bigger
+
+-Check boids math in AI as it seems like they are overadjusting and doing adjustments too quickly
+-AI is inconsistent with courses in general as they can drive well but one mistake it messes them up completely.

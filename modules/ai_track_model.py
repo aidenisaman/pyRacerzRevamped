@@ -1,3 +1,6 @@
+#Look into how checkpoints are stored and encoded as the AI in current state are messing up and getting lost and I belive this is where the mistakes are coming from.
+
+
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 import math

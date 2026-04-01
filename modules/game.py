@@ -61,7 +61,7 @@ class Game:
         sys.exit(1)
 
       # Play music
-      misc.startRandomMusic()
+      #misc.startRandomMusic()
 
       # Put players on the rank
       # If it's the first time do Randomly
