@@ -338,3 +338,9 @@ If new fields are absent, defaults preserve current user experience while allowi
   - active but bounded overtake behavior
 
 ---
+
+NEED TO CHECK:
+-Check boids math in AI as it seems like they are overadjusting and doing adjustments too quickly
+-AI is inconsistent with courses in general as they can drive well but one mistake it messes them up completely.
+-Make AI less aggressive and add a state for when they are stuck off the track
+-Track model might be done incorrect as well so look into that as well
