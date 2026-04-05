@@ -298,6 +298,18 @@ class Game:
     def _run_race(self):
         _init_fonts()
 
+        # Load sound effects
+        try:
+            _snd_collision = pygame.mixer.Sound(os.path.join("sounds", "collision.mp3"))
+            _snd_drift     = pygame.mixer.Sound(os.path.join("sounds", "drift.mp3"))
+            _snd_collision.set_volume(0.6)
+            _snd_drift.set_volume(0.5)
+        except Exception:
+            _snd_collision = None
+            _snd_drift     = None
+
+        _drift_playing = False
+
         for currentTrackName in self.listTrackName:
             try:
                 currentTrack = track.Track(currentTrackName[0], currentTrackName[1])
@@ -351,6 +363,7 @@ class Game:
             slide_y         = 60
             lap_flash_timer = 0
             minimap_cache   = [None]
+            _drift_playing  = False
 
             for play in self.listPlayer:
                 play.bestChrono = 999999
@@ -403,6 +416,8 @@ class Game:
                     elif event.type == KEYDOWN:
                         if event.key == K_ESCAPE:
                             misc.stopMusic()
+                            if _snd_drift and _drift_playing:
+                                _snd_drift.stop()
                             return
 
                         if event.key == K_p:
@@ -416,10 +431,14 @@ class Game:
                                 pygame.display.flip()
                             elif event.key == K_t:
                                 misc.stopMusic()
+                                if _snd_drift and _drift_playing:
+                                    _snd_drift.stop()
                                 self._restart_requested = True
                                 return
                             elif event.key == K_q:
                                 misc.stopMusic()
+                                if _snd_drift and _drift_playing:
+                                    _snd_drift.stop()
                                 return
                         else:
                             for play in self.listPlayer:
@@ -547,10 +566,13 @@ class Game:
                         elif pCR:
                             play.car.newSpeed = 0
 
+                # Play collision sound when cars hit each other
                 for play in self.listPlayer:
                     if play.car.newSpeed != 0:
                         play.car.speed    = play.car.newSpeed
                         play.car.newSpeed = 0
+                        if _snd_collision:
+                            _snd_collision.play()
 
                 popUp.display()
                 l.append(popUp.rect.__copy__())
@@ -647,6 +669,15 @@ class Game:
                 draw_minimap(misc.screen, currentTrack, self.listPlayer,
                              minimap_cache, minimap_pos)
 
+                # Play drift sound when player car is drifting
+                if _snd_drift:
+                    if self.listPlayer[0].car.drifting and not _drift_playing:
+                        _snd_drift.play(-1)
+                        _drift_playing = True
+                    elif not self.listPlayer[0].car.drifting and _drift_playing:
+                        _snd_drift.stop()
+                        _drift_playing = False
+
                 if i == 1:
                     sec2 = datetime.datetime.now().second
                     if sec2 > sec or (sec == 59 and sec2 > 0):
@@ -687,7 +718,11 @@ class Game:
 
                 clock.tick(100)
 
-            # Race finished
+            # Race finished — stop drift sound if still playing
+            if _snd_drift and _drift_playing:
+                _snd_drift.stop()
+                _drift_playing = False
+
             popUp.display()
             l.append(popUp.rect.__copy__())
 
