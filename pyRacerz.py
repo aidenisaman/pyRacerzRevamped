@@ -97,6 +97,13 @@ def main():
     print(e)
     sys.exit(-1)
 
+  try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if base_dir:
+      os.chdir(base_dir)
+  except Exception:
+    pass
+
   if pygame.display.mode_ok((int(1024*misc.zoom), int(768*misc.zoom)), displayFlags, 24) == 0:
      print("pyRacerz cannot initialize display...")
      sys.exit(-1)
@@ -106,9 +113,9 @@ def main():
   pygame.display.set_caption("pyRacerz v" + misc.VERSION)
   pygame.display.set_icon(pygame.image.load(os.path.join("sprites", "pyRacerzIcon.bmp")))
 
-  if misc.music == 1:
-    pygame.mixer.music.load(os.path.join("sounds", "start.ogg"))
-    pygame.mixer.music.play()
+  pygame.mixer.music.load(os.path.join("musics", "menu_music.wav"))
+  pygame.mixer.music.set_volume(0.5)
+  pygame.mixer.music.play(-1)
 
   #figure out what psyco was
   try:
@@ -118,14 +125,15 @@ def main():
     print ("Cannot use psyCo...")
     pass
   
-  pygame.mouse.set_visible(0)
+  # pygame.mouse.set_visible(1)
+  pygame.mouse.set_visible(1)
 
   misc.init()
 
   select1 = 1
 
   while select1 != -1:
-    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License"])
+    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores"], misc.main_menu_background)
     select1 = menu1.getInput()
 
     # Single Race
