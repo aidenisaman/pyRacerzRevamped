@@ -11,7 +11,7 @@ Date: 5 April 2026
 
 ## Issues Found
 
-### RED — Must Fix Before Merge
+### Must Fix Before Merge
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
@@ -21,7 +21,7 @@ Date: 5 April 2026
 | 4 | game.py | Replay saving uses old string format | Replace with `zlib.compress(replayArray.tobytes())` |
 | 5 | modules/__pycache__ | Binary cache files committed to repo | Add __pycache__ to .gitignore and remove from repo |
 
-### YELLOW — Should Fix
+### Should Fix
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
@@ -32,5 +32,5 @@ Date: 5 April 2026
 | 10 | game.py | Magic numbers 400, 500, 630 in results screen | Replace with named constants |
 
 ## Summary
-5 red issues must be fixed before merge. The UI features are solid. 
+5 Main issues must be fixed before merge. The UI features are solid. 
 Main blockers are the hardcoded Windows path, old sha1 syntax and committed cache files.
