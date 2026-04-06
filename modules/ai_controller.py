@@ -1,5 +1,5 @@
 import math
-#Slow down each command input to possibably help with strange descisions and getting lost/stuck.
+
 from .ai_types import BehaviorState
 from .ai_types import ControlCommand
 
@@ -9,53 +9,113 @@ def clamp(value, lo, hi):
 
 
 class AIController:
+  """Simplified controller that ports the legacy AI's steering logic.
+
+  The key difference from centroid targeting: steering is determined
+  entirely by the raycast best direction (via heading_error), not by
+  force mixing. The boids force total just carries the raycast result.
+  """
+
   def command_from_forces(self, bot_player, snapshot, forces, runtime_state, profile):
     car = bot_player.car
-    total = forces.total
 
-    desired_heading = math.atan2(total[1], total[0]) if (abs(total[0]) + abs(total[1])) > 1e-9 else car.angle
-    steer_error = _angle_diff(desired_heading, car.angle)
-    steer_raw = clamp(steer_error / (math.pi / 3.0), -profile.max_steer_aggression, profile.max_steer_aggression)
-
-    # Smooth steering to avoid twitching.
-    alpha = clamp(profile.reaction_smoothing, 0.0, 1.0)
-    steer = runtime_state.smoothed_steer * alpha + steer_raw * (1.0 - alpha)
-    runtime_state.smoothed_steer = steer
-
-    target_speed = _target_speed(bot_player, snapshot, profile, runtime_state)
-    speed_error = target_speed - car.speed
-
+    # RECOVER: reverse briefly then go forward.
     if runtime_state.state == BehaviorState.RECOVER:
-      # Reverse briefly if strongly off-road, else crawl forward while re-aligning.
-      if snapshot.offroad_ratio_local > 0.55 and car.speed < 0.7:
-        return ControlCommand(throttle=0.0, brake=1.0, steer=steer)
-      return ControlCommand(throttle=0.35, brake=0.0, steer=steer)
+      if runtime_state.recover_reverse_frames > 0:
+        runtime_state.recover_reverse_frames -= 1
+        # Reverse with slight random steering to unstick
+        return ControlCommand(throttle=0.0, brake=0.95, steer=0.3)
+      return ControlCommand(throttle=0.5, brake=0.0, steer=0.0)
 
+    # heading_error carries the angular offset from the best raycast direction.
+    # Negative = best road is to the left, positive = to the right.
+    he = snapshot.heading_error
+
+    # Determine wall distance from the best direction's score
+    wall_ahead = snapshot.distance_to_wall_ahead
+
+    # Speed-dependent wall braking (ported from legacy AI)
+    speed = car.speed
+    max_speed = car.maxSpeed
+    speed_ratio = speed / max_speed if max_speed > 0 else 0
+
+    # Wall limits depend on difficulty level
+    level = car.level
+    if level == 1:
+      wall_limit_center = 300.0
+      wall_limit_near = 400.0
+    elif level == 2:
+      wall_limit_center = 450.0
+      wall_limit_near = 600.0
+    else:
+      wall_limit_center = 600.0
+      wall_limit_near = 800.0
+
+    # Steering based on the best ray direction
+    steer = 0.0
     throttle = 0.0
     brake = 0.0
-    if speed_error > 0.2:
-      throttle = clamp(0.25 + speed_error * 0.22, 0.0, 1.0)
-    elif speed_error < -0.2:
-      brake = clamp(0.12 + (-speed_error) * 0.30, 0.0, 1.0)
 
-    # Dense packs should brake slightly earlier.
-    brake += clamp(snapshot.neighbors_in_radius * profile.crowding_brake_gain * 0.05, 0.0, 0.4)
+    # Which side is the best direction?
+    # he < 0 = left is better, he > 0 = right is better, he ≈ 0 = straight
+    abs_he = abs(he)
 
-    if runtime_state.state == BehaviorState.AVOID_COLLISION:
-      brake = max(brake, 0.35)
-      throttle *= 0.6
-    elif runtime_state.state == BehaviorState.OVERTAKE_BIAS:
-      throttle = min(1.0, throttle + 0.12)
+    if abs_he < 0.01:
+      # Straight ahead is best — check if we need to center on road
+      steer = 0.0
+      throttle = 1.0
 
-    brake = clamp(brake, 0.0, 1.0)
-    throttle = clamp(throttle, 0.0, 1.0)
+      # Road centering: if left and right wall distances differ a lot, steer to center
+      if abs(snapshot.distance_to_wall_left - snapshot.distance_to_wall_right) > 100:
+        if snapshot.distance_to_wall_left > snapshot.distance_to_wall_right:
+          steer = -0.5  # Steer left (more room on left)
+        else:
+          steer = 0.5   # Steer right (more room on right)
+    elif abs_he < math.pi / 5.0:
+      # Slight turn needed
+      throttle = 1.0
+      steer = 0.8 if he > 0 else -0.8
+    elif abs_he < 2.0 * math.pi / 5.0:
+      # Moderate turn — reduce throttle
+      throttle = 0.5
+      steer = 0.9 if he > 0 else -0.9
+    else:
+      # Sharp turn — brake and steer hard
+      throttle = 0.0
+      steer = 1.0 if he > 0 else -1.0
 
-    return ControlCommand(throttle=throttle, brake=brake, steer=steer)
+    # Speed-dependent braking when approaching walls
+    if speed > 0 and wall_ahead < 800:
+      should_brake = False
+      if abs_he < 0.01 and wall_ahead < wall_limit_center * speed_ratio:
+        should_brake = True
+      elif abs_he < math.pi / 5.0 and wall_ahead < wall_limit_near * speed_ratio:
+        should_brake = True
+      elif abs_he >= 2.0 * math.pi / 5.0:
+        should_brake = True
+
+      if should_brake:
+        throttle = 0.0
+        brake = 1.0
+
+    # Never brake at very low speed (legacy behavior)
+    if speed < 0.5:
+      brake = 0.0
+
+    # If moving backward outside recovery, push forward
+    if speed < -0.20 and runtime_state.state != BehaviorState.RECOVER:
+      throttle = 1.0
+      brake = 0.0
+
+    return ControlCommand(
+      throttle=clamp(throttle, 0.0, 1.0),
+      brake=clamp(brake, 0.0, 1.0),
+      steer=clamp(steer, -1.0, 1.0),
+    )
 
 
 class CommandApplier:
   def apply(self, bot_player, command):
-    # Throttle / brake are mapped into binary legacy controls for now.
     if command.throttle > 0.1:
       bot_player.car.doAccel()
       bot_player.keyAccelPressed = 1
@@ -70,11 +130,11 @@ class CommandApplier:
       bot_player.car.noBrake()
       bot_player.keyBrakePressed = 0
 
-    if command.steer < -0.15:
+    if command.steer < -0.28:
       bot_player.car.doLeft()
       bot_player.keyLeftPressed = 1
       bot_player.keyRightPressed = 0
-    elif command.steer > 0.15:
+    elif command.steer > 0.28:
       bot_player.car.doRight()
       bot_player.keyRightPressed = 1
       bot_player.keyLeftPressed = 0
@@ -82,35 +142,3 @@ class CommandApplier:
       bot_player.car.noWheel()
       bot_player.keyLeftPressed = 0
       bot_player.keyRightPressed = 0
-
-
-def _target_speed(bot_player, snapshot, profile, runtime_state):
-  speed_cap = bot_player.car.maxSpeed
-
-  # Curvature and wall proximity reduce target speed.
-  curvature_penalty = min(abs(snapshot.curvature_ahead) * 10.0, 0.55)
-  wall_penalty = 0.0
-  if snapshot.distance_to_wall_ahead < 100.0:
-    wall_penalty = (100.0 - max(snapshot.distance_to_wall_ahead, 0.0)) / 100.0
-
-  target = speed_cap * (1.0 - curvature_penalty * 0.7 - wall_penalty * 0.55)
-  if snapshot.offroad_ratio_local > 0.0:
-    target *= 0.75
-
-  if runtime_state.state == BehaviorState.AVOID_COLLISION:
-    target *= 0.75
-  elif runtime_state.state == BehaviorState.RECOVER:
-    target = min(target, max(0.7, speed_cap * 0.35))
-  elif runtime_state.state == BehaviorState.OVERTAKE_BIAS:
-    target = min(speed_cap, target * 1.08)
-
-  return clamp(target, 0.6, speed_cap)
-
-
-def _angle_diff(a, b):
-  d = a - b
-  while d > math.pi:
-    d -= 2.0 * math.pi
-  while d < -math.pi:
-    d += 2.0 * math.pi
-  return d

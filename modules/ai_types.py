@@ -56,6 +56,7 @@ class BotRuntimeState:
   neighbor_ids_cached: List[int] = field(default_factory=list)
   recent_progress: float = 0.0
   frames_since_progress: int = 0
+  recover_reverse_frames: int = 0
 
 
 @dataclass

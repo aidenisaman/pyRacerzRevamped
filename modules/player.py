@@ -26,7 +26,7 @@ import random
 import math
 import os
 
-from .ai_architecture import BoidsAIRuntime
+from .ai_direct import DirectAIRuntime
 
 class Player:
   '''Virtual class for any pyRacerz player'''
@@ -159,9 +159,9 @@ class RobotPlayer(Player):
     self.keyLeftPressed = 0
     self.keyRightPressed = 0
 
-    # New AI is now default; keep legacy fallback for debugging/regression checks.
-    self.useBoidsAI = os.environ.get("PYRACERZ_USE_LEGACY_AI", "0") != "1"
-    self.aiRuntime = BoidsAIRuntime(level)
+    # Use legacy compute() by default; enable DirectAIRuntime explicitly.
+    self.useBoidsAI = os.environ.get("PYRACERZ_USE_DIRECT_AI", "0") == "1"
+    self.aiRuntime = DirectAIRuntime(level)
     self.racePlayers = [self]
 
   def set_race_context(self, listPlayers):

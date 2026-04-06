@@ -47,6 +47,12 @@ class Track:
   def __init__(self, name, reverse=0):
     self.track = pygame.transform.scale(getImageFromTrackName(name), (int(1024*misc.zoom), int(768*misc.zoom)))
     self.trackF = pygame.transform.scale(getImageFFromTrackName(name), (int(1024*misc.zoom), int(768*misc.zoom)))
+    # Optional nav-only AI surface (e.g. cityF2.png). Keep trackF unchanged.
+    bot_nav_path = os.path.join("tracks", name + "F2.png")
+    if os.path.exists(bot_nav_path):
+      self.trackF_bot_nav = pygame.transform.scale(pygame.image.load(bot_nav_path).convert(), (int(1024*misc.zoom), int(768*misc.zoom)))
+    else:
+      self.trackF_bot_nav = None
     confFile=configparser.ConfigParser()
     confFile.read_file(open(os.path.join("tracks", name + ".conf"), "r"))
 
