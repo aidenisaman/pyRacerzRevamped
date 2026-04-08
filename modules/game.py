@@ -642,25 +642,27 @@ class Game:
         
         waitMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "recording Replay...")
 
-        if select2 != None and select2 != "":
-          f = open(os.path.join("replays", select2 + ".rep"), "wb")
+    if select2 != None and select2 != "":
+      f = open(os.path.join("replays", select2 + ".rep"), "wb")
 
-          # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
-          f.write(str(misc.VERSION) + " " + currentTrack.name + " " + str(currentTrack.reverse) + " " + str(masterChrono) + " " + str(len(self.listPlayer)) + " ")
-          for play in self.listPlayer:
-            f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
-          f.write("\n")
+      # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
+      header = (
+          str(misc.VERSION) + " " +
+          currentTrack.name + " " +
+          str(currentTrack.reverse) + " " +
+          str(masterChrono) + " " +
+          str(len(self.listPlayer)) + " "
+      )
+      for play in self.listPlayer:
+          header += play.name + " " + str(play.car.color) + " " + str(play.car.level) + " "
+      header += "\n"
 
-          # Put the array into the Replay File
-          stringFile = ""
-          try:
-            while 1:
-              stringFile = stringFile + str(replayArray.pop(0)) + " "
-          except Exception:
-            pass
-          f.write(zlib.compress(stringFile))
+      f.write(header.encode())
 
-          f.close()
+      # Save replay data in compact binary form
+      f.write(zlib.compress(replayArray.tobytes()))
+
+      f.close()
 
       self.computeScores(currentTrack)
 
