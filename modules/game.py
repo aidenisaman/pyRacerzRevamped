@@ -32,7 +32,6 @@ from . import misc
 import sys
 import os
 import datetime
-import shutil
 
 class Game:
   '''Class representing a game: Tournament or Single Race'''
@@ -140,43 +139,25 @@ class Game:
       countdownFont = pygame.font.Font(None, int(150*misc.zoom))
 
       # Try to load countdown sound: prefer project `sounds/`, else copy from Downloads, else fall back to bundled countdowns
+      # Load countdown sound only from project files
       countdown_sound = None
       countdown_channel = None
-      sound_name = "mixkit-melodic-race-countdown-1955.wav"
-      local_sound_path = os.path.join("sounds", sound_name)
-      user_sound_path = r"c:\Users\nalla\Downloads\mixkit-melodic-race-countdown-1955.wav"
 
-      # If file already in project sounds, use it
-      try:
-        if os.path.exists(local_sound_path):
-          countdown_sound = pygame.mixer.Sound(local_sound_path)
-        else:
-          # If user's Downloads file exists, copy it into project sounds and use it
-          if os.path.exists(user_sound_path):
-            try:
-              # Ensure sounds directory exists
-              if not os.path.isdir("sounds"):
-                os.makedirs("sounds")
-              shutil.copyfile(user_sound_path, local_sound_path)
-              countdown_sound = pygame.mixer.Sound(local_sound_path)
-            except Exception:
-              # If copy fails, try to load directly from user's path
+      for candidate in (
+          "mixkit-melodic-race-countdown-1955.wav",
+          "countdown_go.wav",
+          "race_start.wav",
+          "countdown_3.wav",
+          "countdown_2.wav",
+          "countdown_1.wav",
+      ):
+          cand_path = os.path.join("sounds", candidate)
+          if os.path.exists(cand_path):
               try:
-                countdown_sound = pygame.mixer.Sound(user_sound_path)
-              except Exception:
-                countdown_sound = None
-          else:
-            # Fallback: try bundled countdown files
-            for candidate in ("countdown_go.wav", "race_start.wav", "countdown_3.wav", "countdown_2.wav", "countdown_1.wav"):
-              cand_path = os.path.join("sounds", candidate)
-              if os.path.exists(cand_path):
-                try:
                   countdown_sound = pygame.mixer.Sound(cand_path)
                   break
-                except Exception:
+              except Exception:
                   countdown_sound = None
-      except Exception:
-        countdown_sound = None
 
       # Show RED light (first signal) with countdown "3"
       imgFireRed = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
