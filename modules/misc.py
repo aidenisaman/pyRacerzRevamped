@@ -148,6 +148,10 @@ def init():
     print(e)
     main_menu_background = background
 
+  # Enable key repeat so held backspace/letters repeat in text-entry menus
+  # (400 ms initial delay, 50 ms repeat interval)
+  pygame.key.set_repeat(400, 50)
+
 def chrono2Str(chrono):
   return str(chrono/100.0).replace(".", "''")
 
@@ -260,7 +264,8 @@ def addHiScore(track, player):
 
   # If the Level is not represented create it and put the Hi-scores
   if not confFile.has_option("hi " + track.name, "level" + str(level)):
-    h = sha1(str(track.name).encode())
+    h = sha1()
+    h.update(str(track.name).encode())
     h.update(("level" + str(level)).encode())
     h.update(player.name.encode())
     h.update(str(player.bestChrono).encode())
@@ -270,13 +275,15 @@ def addHiScore(track, player):
     return 1
   else:
     hi = confFile.get("hi " + track.name, "level" + str(level)).split()
-    h = sha1(str(track.name).encode())
+    h = sha1()
+    h.update(str(track.name).encode())
     h.update(("level" + str(level)).encode())
-    h.update(player.name.encode())
-    h.update(str(player.bestChrono).encode())
+    h.update(hi[0].encode())
+    h.update(hi[1].encode())
     if hi[2] == h.hexdigest():
       if int(hi[1]) > player.bestChrono:
-        h = sha1(str(track.name).encode())
+        h = sha1()
+        h.update(str(track.name).encode())
         h.update(("level" + str(level)).encode())
         h.update(player.name.encode())
         h.update(str(player.bestChrono).encode())
@@ -288,7 +295,8 @@ def addHiScore(track, player):
         return 0
     else:
       # If the HiScore is Corrupted, erase it
-      h = sha1(str(track.name).encode())
+      h = sha1()
+      h.update(str(track.name).encode())
       h.update(("level" + str(level)).encode())
       h.update(player.name.encode())
       h.update(str(player.bestChrono).encode())
@@ -296,7 +304,7 @@ def addHiScore(track, player):
       confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
       confFile.write(fwrite)
       return 1
-
+    
 def getUnlockLevel():
 
   confFile=configparser.ConfigParser() 
@@ -311,15 +319,85 @@ def getUnlockLevel():
     return 0
 
   key = confFile.get("unlockLevel", "key").split()
-  h = sha1("pyRacerz".encode())
+  h = sha1()
+  h.update(str("pyRacerz").encode())
+
   h.update(str(key[0]).encode())
   if h.hexdigest() == key[1]:
     return key[0]
   else:
     return 0
 
-def setUnlockLevel(lck):
+class TextInput:
+  """Reusable single-line text-input helper.
 
+  Decouples key-handling from any specific menu class.  Call ``feed_key``
+  on each KEYDOWN event; it returns ``True`` when the text changed so the
+  caller knows to trigger a refresh.  ``render_text`` returns the display
+  string with a blinking-cursor ``_`` appended when the field is not full.
+
+  Supported keys: K_a–K_z (uppercased), K_0–K_9, K_BACKSPACE.
+  """
+
+  def __init__(self, max_length: int, initial: str = "", allow_space: bool = False) -> None:
+    self.max_length  = max_length
+    self.allow_space = allow_space
+    self.text = initial[:max_length]
+
+  def feed_key(self, key) -> bool:
+    """Process a pygame key code. Returns True if the text changed."""
+    if key == K_BACKSPACE:
+      if self.text:
+        self.text = self.text[:-1]
+        return True
+    elif K_a <= key <= K_z:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key).upper()
+        return True
+    elif K_0 <= key <= K_9:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key)
+        return True
+    elif key == K_SPACE and self.allow_space:
+      if len(self.text) < self.max_length:
+        self.text += " "
+        return True
+    return False
+
+  def render_text(self) -> str:
+    """Return display string; appends '_' cursor when field is not full."""
+    if len(self.text) < self.max_length:
+      return self.text + "_"
+    return self.text
+
+
+class IPTextInput(TextInput):
+  """TextInput variant for IPv4 address entry.
+
+  Accepts digits (0-9) and dots (.) only; letters are ignored.
+  Max length defaults to 15 ("255.255.255.255").
+  """
+
+  def __init__(self, max_length: int = 15, initial: str = "") -> None:
+    super().__init__(max_length, initial, allow_space=False)
+
+  def feed_key(self, key) -> bool:
+    if key == K_BACKSPACE:
+      if self.text:
+        self.text = self.text[:-1]
+        return True
+    elif K_0 <= key <= K_9:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key)
+        return True
+    elif key == K_PERIOD:
+      if len(self.text) < self.max_length and not self.text.endswith("."):
+        self.text += "."
+        return True
+    return False
+
+
+def setUnlockLevel(lck):
   # Only change the unlock level if it's better than the actual one
   if getUnlockLevel() >= lck:
     return
@@ -339,6 +417,7 @@ def setUnlockLevel(lck):
     confFile.read_file(open(".pyRacerz.conf", "r"))
 
   h = sha1("pyRacerz".encode())
+
   h.update(str(lck).encode())
   fwrite = open(".pyRacerz.conf", "w+")
   confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())

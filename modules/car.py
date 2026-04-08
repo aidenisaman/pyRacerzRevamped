@@ -184,15 +184,22 @@ class Car(pygame.sprite.Sprite):
     ''' Function called at each frame to update car sprite...
     It's the main computation method for car movement !'''
 
-    # Get the 4 important point of the car ~ 4 wheels
-    coordN = (self.x - math.cos(self.angle)*self.height/2, self.y - math.sin(self.angle)*self.height/2)
-    coordS = (self.x + math.cos(self.angle)*self.height/2, self.y + math.sin(self.angle)*self.height/2)
-    coordE = (self.x + math.cos(math.pi/2.0-self.angle)*self.width/2, self.y - math.sin(math.pi/2.0-self.angle)*self.width/2)
-    coordW = (self.x - math.cos(math.pi/2.0-self.angle)*self.width/2, self.y + math.sin(math.pi/2.0-self.angle)*self.width/2)
-    coord0 = (int(coordN[0] - math.sin(self.angle)*self.width/2), int(coordN[1] + math.cos(self.angle)*self.width/2))
-    coord1 = (int(coordN[0] + math.sin(self.angle)*self.width/2), int(coordN[1] - math.cos(self.angle)*self.width/2))
-    coord2 = (int(coordS[0] - math.sin(self.angle)*self.width/2), int(coordS[1] + math.cos(self.angle)*self.width/2))
-    coord3 = (int(coordS[0] + math.sin(self.angle)*self.width/2), int(coordS[1] - math.cos(self.angle)*self.width/2))
+    # --- Hoist repeated trig/geometry: cos/sin called once instead of 8 times ---
+    # Also exploits identities: cos(pi/2 - a) = sin(a),  sin(pi/2 - a) = cos(a)
+    cos_a = math.cos(self.angle)
+    sin_a = math.sin(self.angle)
+    half_h = self.height / 2
+    half_w = self.width / 2
+
+    # Get the 4 important points of the car ~ 4 wheels
+    coordN = (self.x - cos_a * half_h, self.y - sin_a * half_h)
+    coordS = (self.x + cos_a * half_h, self.y + sin_a * half_h)
+    coordE = (self.x + sin_a * half_w, self.y - cos_a * half_w)
+    coordW = (self.x - sin_a * half_w, self.y + cos_a * half_w)
+    coord0 = (int(coordN[0] - sin_a * half_w), int(coordN[1] + cos_a * half_w))
+    coord1 = (int(coordN[0] + sin_a * half_w), int(coordN[1] - cos_a * half_w))
+    coord2 = (int(coordS[0] - sin_a * half_w), int(coordS[1] + cos_a * half_w))
+    coord3 = (int(coordS[0] + sin_a * half_w), int(coordS[1] - cos_a * half_w))
 
     #misc.screen.set_at(coord0, (255,0,255))
     #misc.screen.set_at(coord1, (255,0,255))
@@ -255,11 +262,14 @@ class Car(pygame.sprite.Sprite):
 
     g = (g0 + g1 + g2 + g3)/4.0
 
+    # Hoist g/255.0 — used three times below
+    g_norm = g / 255.0
+
     #self.crashFlag=0
 
     # Compute Accel
     # - Accel depends only on present datas
-    self.accel=self.power*(1.0*self.throttle-1.7*self.brake)*(g/255.0)
+    self.accel=self.power*(1.0*self.throttle-1.7*self.brake)*g_norm
 
     # Engine brake
     if self.throttle == 0.0 and self.speed > 0:
@@ -274,19 +284,25 @@ class Car(pygame.sprite.Sprite):
     self.speed=self.speed+self.accel
 
     # Max back speed
-    if self.speed <= self.maxSpeedB*(g/255.0):
-      self.speed = self.maxSpeedB*(g/255.0)
+    if self.speed <= self.maxSpeedB*g_norm:
+      self.speed = self.maxSpeedB*g_norm
       self.accel = 0
 
     # Max speed
-    if self.speed >= self.maxSpeed*(g/255.0):
-      self.speed = self.maxSpeed*(g/255.0)
+    if self.speed >= self.maxSpeed*g_norm:
+      self.speed = self.maxSpeed*g_norm
       self.accel = 0
     
     # If speed is very slow, stop the car
     if self.speed < 0.005 and self.speed > -0.005:
       self.accel = 0.0
       self.speed = 0.0
+
+    # Hoist per-frame constants for oversteer / braking thresholds
+    _power_17 = self.power * 1.7
+    _brake_thresh = _power_17 * (2.0 / 3)
+    _speed_thresh = self.maxSpeed * (2.0 / 3)
+    _abs_accel = abs(self.accel)
 
     # Compute Rotational Speed
 
@@ -298,10 +314,10 @@ class Car(pygame.sprite.Sprite):
     # - Acting on the the Rotational Acceleration
     # - Memory because accelR is used the frame after
     # - Depending on the braking power (accel < 0)
-    if self.accel < -self.power*1.7*(2.0/3) and self.accelR > 0 and self.speed > self.maxSpeed*(2.0/3):
-      self.accelR = self.accelR + abs(self.accel)*0.08
-    elif self.accel < -self.power*1.7*(2.0/3) and self.accelR < 0 and self.speed > self.maxSpeed*(2.0/3):
-      self.accelR = self.accelR - abs(self.accel)*0.08
+    if self.accel < -_brake_thresh and self.accelR > 0 and self.speed > _speed_thresh:
+      self.accelR = self.accelR + _abs_accel*0.08
+    elif self.accel < -_brake_thresh and self.accelR < 0 and self.speed > _speed_thresh:
+      self.accelR = self.accelR - _abs_accel*0.08
     
     # Take in account of understeering at acceleration
     # - Not acting when braking
@@ -340,7 +356,9 @@ class Car(pygame.sprite.Sprite):
     # - Lateral Accel depends only on present datas
     # - The formula is Flat = M v^2  / radius where radius=L/sin(angle)
     if self.angle-self.oldAngle != 0:
-      radius = math.sqrt(math.pow((self.ox - self.x)/misc.zoom, 2) + math.pow((self.oy - self.y)/misc.zoom, 2))/math.sin(self.angle-self.oldAngle)
+      _dx = (self.ox - self.x) / misc.zoom
+      _dy = (self.oy - self.y) / misc.zoom
+      radius = math.hypot(_dx, _dy) / math.sin(self.angle-self.oldAngle)
       if radius > 2000 or radius < -2000 or (radius < 1 and radius > -1):
         self.accelL = 0
       else:
@@ -352,9 +370,9 @@ class Car(pygame.sprite.Sprite):
     # - Acting on speed and accelL to simulate lateral sliding
     # - Only acting when the braking is hard
     # - The accelL augmentation is based on accel (compared to the max accel)
-    if self.accel < -self.power*1.7*(2.0/3) and self.speed > 0:
-      self.accelL = self.accelL * (1 + 1.3*abs(self.accel)/(1.7*self.power))
-      self.speed = self.speed - abs(0.6*self.accel)
+    if self.accel < -_brake_thresh and self.speed > 0:
+      self.accelL = self.accelL * (1 + 1.3*_abs_accel/_power_17)
+      self.speed = self.speed - 0.6*_abs_accel
 
     self.speedL = 0.2*self.speedL + self.accelL
 
@@ -377,15 +395,16 @@ class Car(pygame.sprite.Sprite):
     self.speedL = self.speedL*misc.zoom
     self.speedR = self.speedR*misc.zoom
     
-    if self.speedL > 0.0:
-      self.x = self.x - math.cos(self.angle-math.acos(self.speed/math.sqrt(self.speed*self.speed+self.speedL*self.speedL)))*math.sqrt(self.speed*self.speed+self.speedL*self.speedL)
-      self.y = self.y - math.sin(self.angle-math.acos(self.speed/math.sqrt(self.speed*self.speed+self.speedL*self.speedL)))*math.sqrt(self.speed*self.speed+self.speedL*self.speedL)
-    elif self.speedL < 0.0:
-      self.x = self.x - math.cos(self.angle+math.acos(self.speed/math.sqrt(self.speed*self.speed+self.speedL*self.speedL)))*math.sqrt(self.speed*self.speed+self.speedL*self.speedL)
-      self.y = self.y - math.sin(self.angle+math.acos(self.speed/math.sqrt(self.speed*self.speed+self.speedL*self.speedL)))*math.sqrt(self.speed*self.speed+self.speedL*self.speedL)
+    # Compute position update — hoist sqrt and acos to avoid 4 redundant calls
+    if self.speedL != 0.0:
+      _combined = math.hypot(self.speed, self.speedL)
+      _drift = math.acos(self.speed / _combined)
+      _eff_angle = self.angle - _drift if self.speedL > 0.0 else self.angle + _drift
+      self.x -= math.cos(_eff_angle) * _combined
+      self.y -= math.sin(_eff_angle) * _combined
     else:
-      self.x=self.x-math.cos(self.angle)*self.speed
-      self.y=self.y-math.sin(self.angle)*self.speed
+      self.x -= math.cos(self.angle) * self.speed
+      self.y -= math.sin(self.angle) * self.speed
 
     self.speed = self.speed/misc.zoom
     self.speedL = self.speedL/misc.zoom

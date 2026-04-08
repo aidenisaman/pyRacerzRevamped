@@ -21,6 +21,7 @@
 import pygame
 from pygame.locals import *
 
+import argparse
 import time
 import sys
 import os
@@ -33,62 +34,90 @@ import modules.menu as menu
 import modules.track as track
 import modules.replay as replay
 import modules.challenge as challenge
+import modules.network as network
+import modules.netgame as netgame
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+  """Return the configured ArgumentParser for pyRacerz."""
+  parser = argparse.ArgumentParser(
+    prog="pyRacerz.py",
+    description="pyRacerz - a top-down 2D racing game.",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=(
+      "pyRacerz comes with ABSOLUTELY NO WARRANTY.\n"
+      "This is free software; see the COPYING file for details."
+    ),
+  )
+  parser.add_argument(
+    "--resolution",
+    choices=["640x480", "320x240"],
+    default=None,
+    metavar="WxH",
+    help="set display resolution (default: 1024x768); choices: 640x480, 320x240",
+  )
+  parser.add_argument(
+    "--fullscreen",
+    action="store_true",
+    help="enable fullscreen display",
+  )
+  buf_group = parser.add_mutually_exclusive_group()
+  buf_group.add_argument(
+    "--doublebuf",
+    action="store_true",
+    help="enable double buffering (default on non-Windows)",
+  )
+  buf_group.add_argument(
+    "--nodoublebuf",
+    action="store_true",
+    help="disable double buffering (default on Windows)",
+  )
+  parser.add_argument(
+    "--nosound",
+    action="store_true",
+    help="disable sound and music",
+  )
+  parser.add_argument(
+    "--version",
+    action="version",
+    version=(
+      f"pyRacerz {misc.VERSION}\n"
+      "Copyright (C) 2005 Jujucece <jujucece@gmail.com>\n\n"
+      "pyRacerz comes with ABSOLUTELY NO WARRANTY.\n"
+      "This is free software, and you are welcome to redistribute it\n"
+      "under certain conditions; see the COPYING file for details."
+    ),
+  )
+  return parser
+
 
 def main():
 
-  if os.name == "nt":
-    full = 0
-    double = 0
-  else:
-    full = 0
+  # --- Parse command-line options via argparse ---
+  args = _build_arg_parser().parse_args()
+
+  # Resolution
+  if args.resolution == "640x480":
+    misc.zoom = 0.625
+  elif args.resolution == "320x240":
+    misc.zoom = 0.3125
+
+  # Sound
+  if args.nosound:
+    misc.music = 0
+
+  # Double-buffering: OS default (off on Windows, on elsewhere), overridden by flags
+  double = 0 if os.name == "nt" else 1
+  if args.doublebuf:
     double = 1
+  elif args.nodoublebuf:
+    double = 0
 
+  # Build pygame display flags
   displayFlags = HWSURFACE
-
-  # Get commandline options
-  if len(sys.argv) != 1:
-    for i in range(1, len(sys.argv)):
-      if sys.argv[i].upper() == "--RESOLUTION":
-        # Get the resolution
-        if i != len(sys.argv)-1 and sys.argv[i+1].upper() == "640X480":
-          misc.zoom = 0.625
-        elif i != len(sys.argv)-1 and sys.argv[i+1].upper() == "320X240":
-          misc.zoom = 0.3125
-      if sys.argv[i].upper() == "--FULLSCREEN":
-        full = 1
-      if sys.argv[i].upper() == "--DOUBLEBUF":
-        double = 1
-      if sys.argv[i].upper() == "--NODOUBLEBUF":
-        double = 0
-      if sys.argv[i].upper() == "--NOSOUND":
-        misc.music = 0
-      if sys.argv[i].upper() == "--HELP" or sys.argv[i].upper() == "-H":
-        print ("USAGE: pyRacerz.py [--resolution 640x480|320x240] [--fullscreen] [--doublebuf|--nodoublebuf] [--nosound] [--help|-h] [--version]")
-        print()
-        print("  --resolution   Change resolution (default is 1024x768)")
-        print("  --fullscreen   Enable fullscreen display")
-        print("  --doublebuf    Enable double buffering display (DEFAULT on other platform than Windows)")
-        print("  --nodoublebuf  Disable double buffering display (DEFAULT on Windows)")
-        print("  --nosound      Disable Sound")
-        print("  --help|-h      Display this help and exit")
-        print("  --version      Output version information and exit")
-        sys.exit(0)
-      if sys.argv[i].upper() == "--VERSION":
-        print("pyRacerz version " + misc.VERSION + ", Copyright (C) 2005 Jujucece <jujucece@gmail.com>")
-        print()
-        print("pyRacerz comes with ABSOLUTELY NO WARRANTY.")
-        print("This is free software, and you are welcome to redistribute it")
-        print("under certain conditions; see the COPYING file for details.")
-        sys.exit(0)
-      
-  if full == 1 and double == 1:
-    displayFlags = displayFlags|DOUBLEBUF|FULLSCREEN
-  elif full == 1 and double == 0:
-    displayFlags = displayFlags|FULLSCREEN
-  elif full == 0 and double == 1:
-    displayFlags = displayFlags|DOUBLEBUF
-  elif full == 0 and double == 0:
-    displayFlags = displayFlags
+  if args.fullscreen:
+    displayFlags |= FULLSCREEN
+  if double:
+    displayFlags |= DOUBLEBUF
 
   try:
     pygame.init()
@@ -133,9 +162,14 @@ def main():
   select1 = 1
 
   while select1 != -1:
-    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores"], misc.main_menu_background)
-    select1 = menu1.getInput()
-
+    menu1 = menu.SimpleMenu(
+        misc.titleFont,
+        "pyRacerz v" + misc.VERSION,
+        20 * misc.zoom,
+        misc.itemFont,
+        ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License", "Multiplayer"],
+        misc.main_menu_background
+    )
     # Single Race
     if select1 == 1:
       race = game.Game("singleRace")
@@ -279,6 +313,112 @@ def main():
     elif select1 == 7:
       licenseMenu = menu.MenuLicense(misc.titleFont, "license", 10*misc.zoom, misc.smallItemFont)
       misc.wait4Key()
+
+    # ── Network Multiplayer ────────────────────────────────────────────
+    elif select1 == 8:
+      net_mode = menu.NetworkModeMenu(misc.titleFont, misc.itemFont).getInput()
+
+      # ── HOST ──────────────────────────────────────────────────────
+      if net_mode == "host":
+        hostName = menu.ChooseTextMenu(
+          misc.titleFont, "multiplayer: enter your name",
+          5 * misc.zoom, misc.itemFont, 16).getInput()
+        if not hostName:
+          continue
+
+        trackInfo = menu.ChooseTrackMenu(
+          misc.titleFont, "network: chooseTrack",
+          2 * misc.zoom, misc.itemFont).getInput()
+        if trackInfo == -1:
+          continue
+
+        laps_menu = menu.ChooseValueMenu(
+          misc.titleFont, "network: chooseNbLaps",
+          0, misc.itemFont, 1, 10)
+        laps = laps_menu.getInput()
+        if laps == -1:
+          continue
+
+        thePlayer = menu.ChooseHumanPlayerMenu(
+          misc.titleFont, "network: choosePlayer",
+          5 * misc.zoom, misc.itemFont).getInput()
+        if thePlayer == -1:
+          continue
+
+        srv = network.NetworkServer()
+        srv.start()
+
+        # Lobby → Race loop (keeps cycling until host closes lobby)
+        while True:
+          lobby = menu.NetworkLobbyMenu(
+            srv, is_host=True,
+            local_name=hostName,
+            track_name=trackInfo[0],
+            track_rev=trackInfo[1],
+            host_color=thePlayer.car.color,
+            host_level=thePlayer.car.level,
+            laps=laps,
+          )
+          result = lobby.getInput()
+
+          if result["action"] == "close":
+            break   # srv already stopped inside lobby
+
+          elif result["action"] == "start":
+            currentTrack = track.Track(trackInfo[0], trackInfo[1])
+            misc.startRandomMusic()
+            netgame.NetworkHostRace(srv, thePlayer, currentTrack, laps).run()
+            misc.stopMusic()
+            # Loop back to lobby for another race
+
+      # ── JOIN ──────────────────────────────────────────────────────
+      elif net_mode == "join":
+        ip = menu.NetworkIPMenu(misc.titleFont, misc.itemFont).getInput()
+        if not ip:
+          continue
+
+        playerName = menu.ChooseTextMenu(
+          misc.titleFont, "multiplayer: enter your name",
+          5 * misc.zoom, misc.itemFont, 16).getInput()
+        if not playerName:
+          continue
+
+        cli = network.NetworkClient(ip)
+        connecting = menu.SimpleTitleOnlyMenu(
+          misc.titleFont, "Connecting to " + ip + "...")
+        if not cli.connect():
+          fail = menu.SimpleTitleOnlyMenu(misc.titleFont, "Cannot connect!")
+          misc.wait4Key()
+          continue
+
+        cli.send({"type": "hello", "name": playerName})
+
+        # Lobby → Watch loop (cycles until client leaves)
+        while True:
+          lobby = menu.NetworkLobbyMenu(
+            cli, is_host=False,
+            local_name=playerName,
+          )
+          result = lobby.getInput()
+
+          if result["action"] == "leave":
+            break   # cli already disconnected inside lobby
+
+          elif result["action"] == "start":
+            misc.startRandomMusic()
+            netgame.NetworkWatchRace(
+              cli,
+              spectator_name=playerName,
+              host_name=result["host_name"],
+              host_color=result["host_color"],
+              host_level=result["host_level"],
+              track_name=result["track"],
+              track_reverse=result["reverse"],
+              laps=result["laps"],
+              remote_player_infos=result.get("roster", []),
+            ).run()
+            misc.stopMusic()
+            # Loop back to lobby for another race
 
 #import profile
 #profile.run('main()')
