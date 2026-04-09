@@ -176,6 +176,9 @@ class RobotPlayer(Player):
     self.stuck_attempts = 0
     self.is_reversing = False
     self.reverse_timer = 0
+    self.forward_escape_timer = 0
+    self.reverse_chain_count = 0
+    self.escape_turn_bias = 1
     # FIX 3: Position-based stuck detection — track displacement over time,
     # not instantaneous speed, so braking mid-corner doesn't trigger a false
     # "stuck" event and cause unnecessary reversing manoeuvres.
@@ -291,6 +294,9 @@ class RobotPlayer(Player):
       self.stuck_attempts = 0
       self.is_reversing  = False
       self.reverse_timer = 0
+      self.forward_escape_timer = 0
+      self.reverse_chain_count = 0
+      self.escape_turn_bias = 1
 
     self._pos_history.append((self.car.x, self.car.y))
     if len(self._pos_history) > 90:
@@ -300,23 +306,23 @@ class RobotPlayer(Player):
     if getattr(self, 'is_reversing', False):
       self.reverse_timer -= 1
 
-      if self.stuck_attempts % 3 == 0:
+      if self.stuck_attempts % 2 == 0:
         # Reverse + steer left
         self.keyAccelPressed = 0; self.keyBrakePressed = 1
         self.keyLeftPressed  = 1; self.keyRightPressed = 0
-      elif self.stuck_attempts % 3 == 1:
+      else:
         # Reverse + steer right
         self.keyAccelPressed = 0; self.keyBrakePressed = 1
-        self.keyLeftPressed  = 0; self.keyRightPressed = 1
-      else:
-        # Drive forward + steer right (escape if reversing wedged it)
-        self.keyAccelPressed = 1; self.keyBrakePressed = 0
         self.keyLeftPressed  = 0; self.keyRightPressed = 1
 
       if self.reverse_timer <= 0:
         self.is_reversing = False
         self.stuck_attempts += 1
+        self.reverse_chain_count += 1
         self.stuck_timer   = 0
+        # Always force a forward burst after reverse so the bot cannot
+        # get trapped in reverse-only recovery cycles.
+        self.forward_escape_timer = 45
         # FIX 4: After a reversing manoeuvre the car faces a different
         # direction and the stale wp_idx now points at a waypoint that is
         # behind the car.  Clearing current_path_key forces a fresh
@@ -324,6 +330,41 @@ class RobotPlayer(Player):
         self.current_path_key = None
         self.wp_idx = 0
         self._pos_history.clear()
+      return
+
+    # --- Mandatory forward recovery phase after a reverse cycle ---
+    if getattr(self, 'forward_escape_timer', 0) > 0:
+      self.forward_escape_timer -= 1
+      self.keyAccelPressed = 1
+      self.keyBrakePressed = 0
+
+      # During the first half of forced forward recovery, use a turn bias
+      # to break out of trap pockets. Then resume normal route steering.
+      if self.forward_escape_timer > 22:
+        if self.escape_turn_bias > 0:
+          self.keyRightPressed = 1
+          self.keyLeftPressed = 0
+        else:
+          self.keyLeftPressed = 1
+          self.keyRightPressed = 0
+      else:
+        if angle_diff > 0.15:
+          self.keyRightPressed = 1
+          self.keyLeftPressed  = 0
+        elif angle_diff < -0.15:
+          self.keyLeftPressed  = 1
+          self.keyRightPressed = 0
+        else:
+          self.keyLeftPressed  = 0
+          self.keyRightPressed = 0
+
+      # If we are clearly moving again, stop forcing forward early.
+      if len(self._pos_history) >= 20:
+        oldest = self._pos_history[-20]
+        recent_disp = math.hypot(self.car.x - oldest[0], self.car.y - oldest[1])
+        if recent_disp > 25.0:
+          self.forward_escape_timer = 0
+          self.reverse_chain_count = 0
       return
 
     # --- Check for stuck condition ---
@@ -334,10 +375,25 @@ class RobotPlayer(Player):
         self.stuck_timer += 1
       else:
         self.stuck_timer = 0
-        if displacement > 50.0:
-          self.stuck_attempts = 0  # Good progress → reset escalation counter
+        if displacement > 120.0 and self.car.speed > 0.5:
+          # Decay attempts slowly after strong forward progress so we still
+          # preserve alternating recovery behavior in tough sections.
+          self.stuck_attempts = max(0, self.stuck_attempts - 1)
+          self.reverse_chain_count = 0
 
     if self.stuck_timer > 5:
+      # Hard cap consecutive reverse cycles to avoid mountain finish-line
+      # deadlocks where reverse never creates enough clearance.
+      if self.reverse_chain_count >= 3:
+        self.is_reversing = False
+        self.forward_escape_timer = 70 if self.car.track.name == "mountain" else 55
+        self.escape_turn_bias *= -1
+        self.stuck_timer = 0
+        self.current_path_key = None
+        self.wp_idx = 0
+        self._pos_history.clear()
+        return
+
       self.is_reversing  = True
       self.reverse_timer = min(90, 30 + self.stuck_attempts * 20)
       self.stuck_timer   = 0
