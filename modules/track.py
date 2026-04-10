@@ -123,19 +123,6 @@ class Track:
     grid_size = 16
     width, height = self.ai_nav_surface.get_size()
 
-    # ------------------------------------------------------------------
-    # WALKABILITY  (FIX 5)
-    # ------------------------------------------------------------------
-    # Use g > 200 instead of the original g == 255.
-    # Tracks encode road surfaces in the green channel:
-    #   g > 200  — fast road (the actual race surface; anti-aliasing means
-    #               pure g=255 is too strict — legitimate road pixels range
-    #               down to ~235, and checkpoint stripe pixels can be lower)
-    #   g ~ 80-150 — slow zones (forest floor, desert sand, mountain
-    #                shoulder).  Cars CAN drive here but the AI should stay
-    #                on the fast road.  NOT walkable for pathfinding.
-    #   g ~ 0    — hard wall (black: mountains, river banks, tree trunks).
-    #               Completely impassable.
     def is_fast_road(x, y):
       if not (0 <= x < width and 0 <= y < height):
         return False
@@ -200,22 +187,7 @@ class Track:
     for cp, stats in cp_stats.items():
       self.checkpoints[cp] = stats[2]
 
-    # ------------------------------------------------------------------
-    # CENTROID SNAPPING  (FIX 7 + FIX 8)
-    # ------------------------------------------------------------------
-    # FIX 7: increased snap search radius from 3 to 10 grid cells (160 px).
-    #   The old 3-cell radius (~48 px) was sufficient for city/forest but
-    #   fails on mountain where checkpoint stripes span a large obstacle
-    #   and the nearest road pixel is 100-140 px from the centroid.
-    #   We also use the snapped position as the A* GOAL (not the raw
-    #   centroid), because the raw centroid can fall inside a wall and no
-    #   grid node will ever be within the 2-cell termination radius of it.
-    #
-    # FIX 8: two consecutive checkpoints can have centroids so close that
-    #   they both snap to the same grid node.  A* then starts and ends at
-    #   the same point and returns an empty path, breaking the entire route.
-    #   We detect this collision and assign the duplicate CP the next-nearest
-    #   distinct walkable node instead.
+
     def snap_to_grid(cx, cy, exclude=None):
       """Return nearest walkable grid node within 10 cells of (cx, cy),
       skipping any node in `exclude`."""
@@ -260,15 +232,6 @@ class Track:
       self.cp_centroids[cp] = snap
       used_snaps.add(snap)
 
-    # ------------------------------------------------------------------
-    # A* PATHFINDING  (FIX 2)
-    # ------------------------------------------------------------------
-    # FIX 2: replace the hard layer-crossing block with a soft cost penalty.
-    # The original code did: if abs(blue_diff) > 50: skip neighbour.
-    # This blocked A* from ever crossing bridge / overpass transitions that
-    # the track layout requires (city upper road, desert bridge, mountain
-    # left loop).  A soft penalty of 5.0 still discourages unnecessary layer
-    # hops while allowing them when no same-layer path exists.
     def astar(start, goal):
       if start == goal:
         # Trivially adjacent CPs share a grid node; no waypoints needed.
