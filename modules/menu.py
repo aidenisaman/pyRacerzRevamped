@@ -37,9 +37,11 @@ def _screen_rect():
   return misc.screen.get_rect()
 
 
-def _clear_row(y, height):
+def _clear_row(y, height, background=None):
+  if background is None:
+    background = misc.background
   rect = pygame.Rect(0, y, _screen_rect().width, height)
-  misc.screen.blit(misc.background, rect, rect)
+  misc.screen.blit(background, rect, rect)
 
 
 def _blit_center(surf, y):
@@ -146,7 +148,7 @@ class SimpleMenu(Menu):
       textRect = text.get_rect()
       textRect.centerx = _screen_rect().centerx
       textRect.y = y
-      _clear_row(textRect.y, textRect.height)
+      _clear_row(textRect.y, textRect.height, self.background)
       misc.screen.blit(text, textRect)
       y = y + textRect.height + self.gap
       i = i + 1
@@ -190,8 +192,8 @@ class SimpleTitleOnlyMenu(Menu):
     textRect = text.get_rect()
     textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    _clear_row(textRectTitle.y, textRectTitle.height)
-    _clear_row(textRect.y, textRect.height)
+    _clear_row(textRectTitle.y, textRectTitle.height, self.background)
+    _clear_row(textRect.y, textRect.height, self.background)
 
     misc.screen.blit(textTitle, textRectTitle)
     misc.screen.blit(text, textRect)
@@ -350,71 +352,6 @@ class ChooseTrackMenu(Menu):
 
       pygame.display.flip()
 
-
-    def refresh(self):
-      misc.screen.blit(self.background, (0, 0))
-      titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
-
-      tile_w = int(180 * misc.zoom)
-      tile_h = int(110 * misc.zoom)
-
-      selected_w = int(205 * misc.zoom)
-      selected_h = int(130 * misc.zoom)
-
-      gap_x = int(30 * misc.zoom)
-      gap_y = int(50 * misc.zoom)
-      cols = 4
-
-      screen_rect = misc.screen.get_rect()
-      grid_start_y = self.startY + int(80 * misc.zoom)
-
-      total_grid_w = cols * tile_w + (cols - 1) * gap_x
-      start_x = (screen_rect.width - total_grid_w) // 2
-
-      for idx, iconTrack in enumerate(self.listIconTracks):
-          row = idx // cols
-          col = idx % cols
-
-          base_x = start_x + col * (tile_w + gap_x)
-          base_y = grid_start_y + row * (tile_h + gap_y + 30)
-
-          display_name = self.listAvailableTrackNames[idx].capitalize()
-          if idx + 1 == self.select and self.reverse == 1:
-              display_name += " REV"
-
-          if idx + 1 == self.select:
-              draw_w = selected_w
-              draw_h = selected_h
-              draw_x = base_x - (selected_w - tile_w) // 2
-              draw_y = base_y - int(10 * misc.zoom)
-
-              scaled_icon = pygame.transform.scale(iconTrack, (draw_w, draw_h))
-              icon_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-
-              misc.screen.blit(scaled_icon, icon_rect)
-              pygame.draw.rect(misc.screen, misc.lightColor, icon_rect, 4)
-
-              label = self.itemFont.render(display_name, True, misc.lightColor)
-              label_rect = label.get_rect()
-              label_rect.centerx = icon_rect.centerx
-              label_rect.y = icon_rect.bottom + int(8 * misc.zoom)
-              misc.screen.blit(label, label_rect)
-
-          else:
-              scaled_icon = pygame.transform.scale(iconTrack, (tile_w, tile_h))
-              icon_rect = pygame.Rect(base_x, base_y, tile_w, tile_h)
-
-              misc.screen.blit(scaled_icon, icon_rect)
-              pygame.draw.rect(misc.screen, misc.darkColor, icon_rect, 2)
-
-              label = self.itemFont.render(display_name, True, misc.darkColor)
-              label_rect = label.get_rect()
-              label_rect.centerx = icon_rect.centerx
-              label_rect.y = icon_rect.bottom + int(8 * misc.zoom)
-              misc.screen.blit(label, label_rect)
-
-      pygame.display.flip()
-
 class ChooseValueMenu(Menu):
   '''Menu to choose a value between a Min and a Max'''
 
@@ -435,46 +372,46 @@ class ChooseValueMenu(Menu):
     # The 1 is selected
     self.select = self.vMin
 
-    def getInput(self):
-    
-      def handle_key(key):
-        cols = 4
+  def getInput(self):
+  
+    def handle_key(key):
+      cols = 4
 
-        if key == K_ESCAPE:
-          return -1
+      if key == K_ESCAPE:
+        return -1
 
-        if key == K_LEFT:
-          if self.select > self.vMin:
-            self.select -= 1
-          else:
-            self.select = self.vMax
-          return "refresh"
+      if key == K_LEFT:
+        if self.select > self.vMin:
+          self.select -= 1
+        else:
+          self.select = self.vMax
+        return "refresh"
 
-        if key == K_RIGHT:
-          if self.select < self.vMax:
-            self.select += 1
-          else:
-            self.select = self.vMin
-          return "refresh"
+      if key == K_RIGHT:
+        if self.select < self.vMax:
+          self.select += 1
+        else:
+          self.select = self.vMin
+        return "refresh"
 
-        if key == K_UP:
-          new_select = self.select - cols
-          if new_select >= self.vMin:
-            self.select = new_select
-          return "refresh"
+      if key == K_UP:
+        new_select = self.select - cols
+        if new_select >= self.vMin:
+          self.select = new_select
+        return "refresh"
 
-        if key == K_DOWN:
-          new_select = self.select + cols
-          if new_select <= self.vMax:
-            self.select = new_select
-          return "refresh"
+      if key == K_DOWN:
+        new_select = self.select + cols
+        if new_select <= self.vMax:
+          self.select = new_select
+        return "refresh"
 
-        if key == K_RETURN:
-          return self.select
+      if key == K_RETURN:
+        return self.select
 
-        return None
+      return None
 
-      return _menu_loop(self.refresh, handle_key)
+    return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
     misc.screen.blit(self.background, (0, 0))
@@ -526,7 +463,7 @@ class ChooseValueMenu(Menu):
         misc.screen.blit(text, text_rect)
 
     pygame.display.flip()
-
+    
 class ChooseTextMenu(Menu):
   '''Menu to choose a Test'''
 
@@ -1601,6 +1538,7 @@ class MenuHiscores(Menu):
       confFile.readfp(open(".pyRacerz.conf", "r")) 
     except Exception:
       return
+
 
     deleteRect = pygame.Rect(0, self.startY, _screen_rect().width, _screen_rect().height - self.startY)
     misc.screen.blit(misc.background, deleteRect, deleteRect)

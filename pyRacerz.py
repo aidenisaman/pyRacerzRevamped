@@ -170,6 +170,9 @@ def main():
         ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License", "Multiplayer"],
         misc.main_menu_background
     )
+
+    pygame.event.clear()
+    select1 = menu1.getInput()
     # Single Race
     if select1 == 1:
       race = game.Game("singleRace")
