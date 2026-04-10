@@ -146,7 +146,7 @@ def draw_hud(screen, player, masterChrono, maxLapNb, lap_flash_timer):
     screen.blit(_FNT.render("BEST  " + best_str, True, best_col), (tx, ty))
     ty += lh
 
-    speed_val = int(abs(getattr(player.car, 'speed', 0)) * 300)
+    speed_val = int(abs(getattr(player.car, 'speed', 0)) * 50)
     if speed_val > 200:
         spd_col = (230, 0, 0)
     elif speed_val > 120:
