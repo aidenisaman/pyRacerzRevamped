@@ -39,6 +39,16 @@ class Player:
     self.point = 0
     self.rank = 0
 
+  # Input hooks to be overridden by subclasses
+  def handle_keydown(self, key):
+    return
+
+  def handle_keyup(self, key):
+    return
+
+  def update_controls(self):
+    return
+
   def play(self, track, rank):
     '''The player play on track with a rank'''
 
@@ -90,6 +100,42 @@ class HumanPlayer(Player):
     self.keyRightPressed = 0
 
     Player.play(self, track, rank)
+
+  def handle_keydown(self, key):
+    if key == self.keyAccel:
+      self.keyAccelPressed = 1
+    if key == self.keyBrake:
+      self.keyBrakePressed = 1
+    if key == self.keyLeft:
+      self.keyLeftPressed = 1
+    if key == self.keyRight:
+      self.keyRightPressed = 1
+
+  def handle_keyup(self, key):
+    if key == self.keyAccel:
+      self.keyAccelPressed = 0
+    if key == self.keyBrake:
+      self.keyBrakePressed = 0
+    if key == self.keyLeft:
+      self.keyLeftPressed = 0
+    if key == self.keyRight:
+      self.keyRightPressed = 0
+
+  def update_controls(self):
+    if self.keyAccelPressed == 1:
+      self.car.doAccel()
+    else:
+      self.car.noAccel()
+    if self.keyBrakePressed == 1:
+      self.car.doBrake()
+    else:
+      self.car.noBrake()
+    if self.keyLeftPressed == 1:
+      self.car.doLeft()
+    if self.keyRightPressed == 1:
+      self.car.doRight()
+    if self.keyLeftPressed == 0 and self.keyRightPressed == 0:
+      self.car.noWheel()
 
 class NetPlayer(Player):
   '''Class for a network pyRacerz player'''
@@ -196,11 +242,11 @@ class RobotPlayer(Player):
       
       self.keyAccelPressed = 1
       self.keyBrakePressed = 0
-      if minDistIndex == 0 or minDistIndex == 1 or minDistIndex == 2:
+      if minDistIndex == [0] or minDistIndex == [1] or minDistIndex == [2]:
         self.keyLeftPressed = 1
       else:
         self.keyLeftPressed = 0
-      if minDistIndex == 4 or minDistIndex == 5 or minDistIndex == 6:
+      if minDistIndex == [4] or minDistIndex == [5] or minDistIndex == [6]:
         self.keyRightPressed = 1
       else:
         self.keyRightPressed = 0      
@@ -269,6 +315,23 @@ class RobotPlayer(Player):
 
     if self.car.speed < 0.5:
       self.keyBrakePressed = 0
+
+  def update_controls(self):
+    self.compute()
+    if self.keyAccelPressed == 1:
+      self.car.doAccel()
+    else:
+      self.car.noAccel()
+    if self.keyBrakePressed == 1:
+      self.car.doBrake()
+    else:
+      self.car.noBrake()
+    if self.keyLeftPressed == 1:
+      self.car.doLeft()
+    if self.keyRightPressed == 1:
+      self.car.doRight()
+    if self.keyLeftPressed == 0 and self.keyRightPressed == 0:
+      self.car.noWheel()
 
   def findMinObstacle(self, x, y, angle):
     dist = 0
