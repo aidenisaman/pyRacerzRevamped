@@ -83,26 +83,44 @@ class Game:
       # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
       _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
+    def play(self):
+        if (self.gameType is None or self.listTrackName is None
+                or self.listPlayer is None or self.maxLapNb == -1):
+            print("Incomplete game")
+            return
 
-      # Display player names and cars blinking...
-      for i in range(0, 4):
+        restart = True
+        while restart:
+            restart = False
+            self._run_race()
 
-        # Display the track
-        misc.screen.blit(currentTrack.track, (0, 0))
+    def _run_race(self):
+        _init_fonts()
 
-        # Display the player names
-        for play in self.listPlayer:
-          text = misc.popUpFont.render(play.name, 1, misc.lightColor, (0, 0, 0))
-          textRect = text.get_rect()
-          textRect.centerx = play.car.x
-          textRect.centery = play.car.y
-          misc.screen.blit(text, textRect)
+        for currentTrackName in self.listTrackName:
+            try:
+                currentTrack = track.Track(currentTrackName[0], currentTrackName[1])
+            except Exception as e:
+                print("Cannot load track :", e)
+                sys.exit(1)
 
-        pygame.display.flip() 
-        pygame.time.delay(400)
+            misc.startRandomMusic()
 
-        # Display the track
-        misc.screen.blit(currentTrack.track, (0, 0))
+            minimap_pos = (misc.screen.get_width() - MINIMAP_SIZE - 6, 6)
+
+            if currentTrackName == self.listTrackName[0]:
+                listRank = []
+                for play in self.listPlayer:
+                    rank = -1
+                    while rank in listRank or rank == -1:
+                        rank = random.randint(1, len(self.listPlayer))
+                    listRank.append(rank)
+                    play.play(currentTrack, rank)
+            else:
+                for play in self.listPlayer:
+                    play.play(currentTrack, len(self.listPlayer) - play.rank + 1)
+
+            clock = pygame.time.Clock()
 
         # Display the cars
         for play in self.listPlayer:
@@ -354,10 +372,9 @@ class Game:
         popUp.display()
         l.append(popUp.rect.__copy__())
 
-        raceFinish = 1
+        titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "raceResult")
+        y = titleMenu.startY
 
-        currentTrack.track.lock()
-        # Display and manage finished game
         for play in self.listPlayer:
 
           # Change the car sprite
@@ -587,11 +604,37 @@ class Game:
             text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " + 2 = " + str(play.point+morePoint+2) + "  >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
           play.point = play.point + morePoint + 2
 
-        else:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " = " + str(play.point+morePoint) + "     " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
-          play.point = play.point + morePoint
+        titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "finalResult")
+        y = titleMenu.startY
 
-      else:
+        for play in self.listPlayer:
+            self.rank = 1
+            for play2 in self.listPlayer:
+                if play.point < play2.point:
+                    self.rank += 1
+
+            playCar = pygame.transform.rotozoom(
+                pygame.image.load(os.path.join("sprites", "cars",
+                                               "car" + str(play.car.color) + ".png")).convert_alpha(),
+                270, 1.2*misc.zoom)
+
+            if self.rank == 1:
+                text = misc.titleFont.render(
+                    str(play.rank) + "' " + play.name + " :  >> " + str(play.point) + " <<",
+                    1, misc.lightColor)
+            else:
+                text = misc.titleFont.render(
+                    str(play.rank) + "' " + play.name + " : " + str(play.point),
+                    1, misc.darkColor)
+
+            playCarRect = playCar.get_rect()
+            textRect    = text.get_rect()
+            textRect.centerx    = misc.screen.get_rect().centerx + (playCarRect.width + 20*misc.zoom) / 2
+            textRect.y          = y + 80*misc.zoom*play.rank
+            playCarRect.x       = textRect.x - (playCarRect.width + 20*misc.zoom)
+            playCarRect.centery = textRect.centery
+            misc.screen.blit(playCar, playCarRect)
+            misc.screen.blit(text, textRect)
 
         if bestChrono == 1:
           if misc.addHiScore(track, play) == 1:
