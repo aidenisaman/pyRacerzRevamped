@@ -142,13 +142,22 @@ class SimpleMenu(Menu):
     # Print the menu items
     for item in self.listItem:
       if i == self.select:
-        text = self.itemFont.render("> " + item + " <", 1, misc.lightColor)
+        text = self.itemFont.render(item, True, misc.lightColor)
       else:
         text = self.itemFont.render(item, 1, misc.darkColor)
       textRect = text.get_rect()
       textRect.centerx = _screen_rect().centerx
       textRect.y = y
+
+      # 1. Clear the row
       _clear_row(textRect.y, textRect.height, self.background)
+
+
+      # 3. Draw shadow
+      shadow = self.itemFont.render(item, True, (0, 0, 0))
+      misc.screen.blit(shadow, (textRect.x + 2, textRect.y + 2))
+
+      # 4. Draw text
       misc.screen.blit(text, textRect)
       y = y + textRect.height + self.gap
       i = i + 1
@@ -461,6 +470,216 @@ class ChooseValueMenu(Menu):
         text = self.itemFont.render(str(value), True, misc.darkColor)
         text_rect = text.get_rect(center=rect.center)
         misc.screen.blit(text, text_rect)
+
+    pygame.display.flip()
+
+class SingleRaceSetupMenu(Menu):
+  '''Combined setup menu for single race'''
+
+  def __init__(self, titleFont, title, gap, itemFont):
+    Menu.__init__(self, titleFont, title)
+
+    self.gap = gap
+    self.itemFont = itemFont
+
+    self.track_names = track.getAvailableTrackNames()
+    self.track_index = 0
+    self.reverse = 0
+    self.laps = 3
+    self.humans = 1
+    self.bots = 1
+
+    self.listIconTracks = []
+    for trackName in self.track_names:
+      self.listIconTracks.append(
+        pygame.transform.scale(
+          track.getImageFromTrackName(trackName),
+          (int(320 * misc.zoom), int(180 * misc.zoom))
+        )
+      )
+
+    self.startY = int(80 * misc.zoom)
+    self.select = 1
+
+  def getInput(self):
+
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return -1
+
+      if key == K_UP:
+        if self.select > 1:
+          self.select -= 1
+        else:
+          self.select = 5
+        return "refresh"
+
+      if key == K_DOWN:
+        if self.select < 5:
+          self.select += 1
+        else:
+          self.select = 1
+        return "refresh"
+
+      if key == K_LEFT:
+        if self.select == 1:
+          if self.track_index > 0:
+            self.track_index -= 1
+          else:
+            self.track_index = len(self.track_names) - 1
+        elif self.select == 2:
+          if self.laps > 1:
+            self.laps -= 1
+          else:
+            self.laps = 10
+        elif self.select == 3:
+          if self.humans > 0:
+            self.humans -= 1
+          else:
+            self.humans = 4
+        elif self.select == 4:
+          if self.bots > 0:
+            self.bots -= 1
+          else:
+            self.bots = 4
+        return "refresh"
+
+      if key == K_RIGHT:
+        if self.select == 1:
+          if self.track_index < len(self.track_names) - 1:
+            self.track_index += 1
+          else:
+            self.track_index = 0
+        elif self.select == 2:
+          if self.laps < 10:
+            self.laps += 1
+          else:
+            self.laps = 1
+        elif self.select == 3:
+          if self.humans < 4:
+            self.humans += 1
+          else:
+            self.humans = 0
+        elif self.select == 4:
+          if self.bots < 4:
+            self.bots += 1
+          else:
+            self.bots = 0
+        return "refresh"
+
+      if key == K_r and self.select == 1:
+        self.reverse = 1 - self.reverse
+        return "refresh"
+
+      if key == K_RETURN and self.select == 5:
+        if self.humans == 0 and self.bots == 0:
+          self.bots = 1
+        return {
+          "track": self.track_names[self.track_index],
+          "reverse": self.reverse,
+          "laps": self.laps,
+          "humans": self.humans,
+          "bots": self.bots
+        }
+
+      return None
+
+    return _menu_loop(self.refresh, handle_key)
+
+  def refresh(self):
+    misc.screen.blit(self.background, (0, 0))
+
+    overlay = pygame.Surface(misc.screen.get_size())
+    overlay.set_alpha(80)
+    overlay.fill((0, 0, 0))
+    misc.screen.blit(overlay, (0, 0))
+
+    center_x = _screen_rect().centerx
+
+    title_y = 20
+    title_text = self.titleFont.render(self.title, True, misc.lightColor)
+    title_rect = title_text.get_rect()
+    title_rect.centerx = center_x
+    title_rect.y = title_y
+    misc.screen.blit(title_text, title_rect)
+
+    y = title_rect.bottom + int(25 * misc.zoom)
+
+    preview = self.listIconTracks[self.track_index]
+    preview_rect = preview.get_rect()
+    preview_rect.centerx = center_x
+    preview_rect.y = y
+
+    panel_rect = pygame.Rect(
+      preview_rect.x - int(18 * misc.zoom),
+      preview_rect.y - int(18 * misc.zoom),
+      preview_rect.width + int(36 * misc.zoom),
+      preview_rect.height + int(36 * misc.zoom)
+    )
+    pygame.draw.rect(misc.screen, (20, 20, 20), panel_rect)
+    pygame.draw.rect(misc.screen, misc.lightColor, panel_rect, 3)
+
+    misc.screen.blit(preview, preview_rect)
+
+    arrow_color = misc.lightColor if self.select == 1 else misc.darkColor
+
+    left_arrow = self.itemFont.render("<", True, arrow_color)
+    left_rect = left_arrow.get_rect()
+    left_rect.centery = panel_rect.centery
+    left_rect.right = panel_rect.left - int(25 * misc.zoom)
+    misc.screen.blit(left_arrow, left_rect)
+
+    right_arrow = self.itemFont.render(">", True, arrow_color)
+    right_rect = right_arrow.get_rect()
+    right_rect.centery = panel_rect.centery
+    right_rect.left = panel_rect.right + int(25 * misc.zoom)
+    misc.screen.blit(right_arrow, right_rect)
+
+    y = panel_rect.bottom + int(20 * misc.zoom)
+
+    track_label = "Track: " + self.track_names[self.track_index].capitalize()
+    if self.reverse:
+      track_label += " REV"
+
+    items = [
+      track_label,
+      "Laps: " + str(self.laps),
+      "Players: " + str(self.humans),
+      "Bots: " + str(self.bots),
+      "START RACE"
+    ]
+
+    for i, item in enumerate(items, start=1):
+      if i == self.select:
+        text = self.itemFont.render(item, True, misc.lightColor)
+      else:
+        text = self.itemFont.render(item, True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+
+      if i == 5:
+        button_rect = pygame.Rect(
+          center_x - int(150 * misc.zoom),
+          y - int(8 * misc.zoom),
+          int(300 * misc.zoom),
+          text_rect.height + int(16 * misc.zoom)
+        )
+
+        if self.select == 5:
+          pygame.draw.rect(misc.screen, misc.lightColor, button_rect)
+          start_text = self.itemFont.render("START RACE", True, (20, 20, 20))
+        else:
+          pygame.draw.rect(misc.screen, misc.darkColor, button_rect, 2)
+          start_text = self.itemFont.render("START RACE", True, misc.darkColor)
+
+        start_rect = start_text.get_rect(center=button_rect.center)
+        misc.screen.blit(start_text, start_rect)
+        y = button_rect.bottom + int(18 * misc.zoom)
+      else:
+        misc.screen.blit(text, text_rect)
+        y += text_rect.height + int(14 * misc.zoom)
 
     pygame.display.flip()
     

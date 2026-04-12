@@ -28,8 +28,11 @@ import configparser
 
 VERSION = "0.2"
 
-lightColor = (255, 220, 60)
-darkColor = (120, 120, 150)
+# Bright white (for selected text)
+lightColor = (255, 255, 255)
+
+# Strong gray (for unselected text)
+darkColor = (180, 180, 180)
 
 background = None
 main_menu_background = None
