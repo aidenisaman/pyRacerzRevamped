@@ -179,9 +179,6 @@ class RobotPlayer(Player):
     self.forward_escape_timer = 0
     self.reverse_chain_count = 0
     self.escape_turn_bias = 1
-    # FIX 3: Position-based stuck detection — track displacement over time,
-    # not instantaneous speed, so braking mid-corner doesn't trigger a false
-    # "stuck" event and cause unnecessary reversing manoeuvres.
     self._pos_history = []
 
     Player.play(self, track, rank)
@@ -278,15 +275,6 @@ class RobotPlayer(Player):
       self.keyLeftPressed  = 0
       self.keyRightPressed = 0
 
-    # ------------------------------------------------------------------
-    # 5. Unstuck logic  (FIX 3 + FIX 4)
-    # ------------------------------------------------------------------
-    # FIX 3: Position-history-based stuck detection.
-    # The original trigger was abs(speed) < 0.5 which fires during any
-    # normal hard brake or tight corner, causing the bot to reverse
-    # unnecessarily mid-race.  Instead we measure total displacement over
-    # the last 60 frames (~1 s at 60 fps).  Only if the car has barely moved
-    # is it genuinely wedged against a wall.
     if not hasattr(self, '_pos_history'):
       self._pos_history = []
     if not hasattr(self, 'stuck_timer'):
@@ -323,10 +311,6 @@ class RobotPlayer(Player):
         # Always force a forward burst after reverse so the bot cannot
         # get trapped in reverse-only recovery cycles.
         self.forward_escape_timer = 45
-        # FIX 4: After a reversing manoeuvre the car faces a different
-        # direction and the stale wp_idx now points at a waypoint that is
-        # behind the car.  Clearing current_path_key forces a fresh
-        # nearest-waypoint search on the very next frame.
         self.current_path_key = None
         self.wp_idx = 0
         self._pos_history.clear()
