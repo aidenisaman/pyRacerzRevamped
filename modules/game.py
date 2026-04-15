@@ -61,7 +61,7 @@ class Game:
         sys.exit(1)
 
       # Play music
-      misc.startRandomMusic()
+      #misc.startRandomMusic()
 
       # Put players on the rank
       # If it's the first time do Randomly
@@ -83,44 +83,31 @@ class Game:
       # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
       _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
-    def play(self):
-        if (self.gameType is None or self.listTrackName is None
-                or self.listPlayer is None or self.maxLapNb == -1):
-            print("Incomplete game")
-            return
+      # Let AI players inspect the race roster when using new architecture.
+      for play in self.listPlayer:
+        if hasattr(play, "set_race_context"):
+          play.set_race_context(self.listPlayer)
 
-        restart = True
-        while restart:
-            restart = False
-            self._run_race()
 
-    def _run_race(self):
-        _init_fonts()
+      # Display player names and cars blinking...
+      for i in range(0, 4):
 
-        for currentTrackName in self.listTrackName:
-            try:
-                currentTrack = track.Track(currentTrackName[0], currentTrackName[1])
-            except Exception as e:
-                print("Cannot load track :", e)
-                sys.exit(1)
+        # Display the track
+        misc.screen.blit(currentTrack.track, (0, 0))
 
-            misc.startRandomMusic()
+        # Display the player names
+        for play in self.listPlayer:
+          text = misc.popUpFont.render(play.name, 1, misc.lightColor, (0, 0, 0))
+          textRect = text.get_rect()
+          textRect.centerx = play.car.x
+          textRect.centery = play.car.y
+          misc.screen.blit(text, textRect)
 
-            minimap_pos = (misc.screen.get_width() - MINIMAP_SIZE - 6, 6)
+        pygame.display.flip() 
+        pygame.time.delay(400)
 
-            if currentTrackName == self.listTrackName[0]:
-                listRank = []
-                for play in self.listPlayer:
-                    rank = -1
-                    while rank in listRank or rank == -1:
-                        rank = random.randint(1, len(self.listPlayer))
-                    listRank.append(rank)
-                    play.play(currentTrack, rank)
-            else:
-                for play in self.listPlayer:
-                    play.play(currentTrack, len(self.listPlayer) - play.rank + 1)
-
-            clock = pygame.time.Clock()
+        # Display the track
+        misc.screen.blit(currentTrack.track, (0, 0))
 
         # Display the cars
         for play in self.listPlayer:
