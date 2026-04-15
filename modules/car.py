@@ -32,6 +32,11 @@ class Car(pygame.sprite.Sprite):
     image = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + ".png")).convert_alpha()
     imageLight = pygame.image.load(os.path.join("sprites", "cars", "car" + str(color) + "B.png")).convert_alpha()
     
+
+    # Car size scaling
+    self.scale = 1.5   # car size control 
+    
+
     self.sprite = pygame.sprite.RenderPlain(self)
 
     self.miniCar = pygame.transform.rotozoom(image, 0, misc.zoom)
@@ -80,7 +85,6 @@ class Car(pygame.sprite.Sprite):
       carRotLight.blit(carRotLightRaw, ((self.sizeRect-carRotLightRaw.get_width())/2, (self.sizeRect-carRotLightRaw.get_height())/2) )
 
       # Create the car shadow
-      # It's surely possible to use a better method with a mask, but...
       carRotShade = carRot.copy()
       for x in range(0, carRotShade.get_width()):
         for y in range(0, carRotShade.get_height()):
@@ -105,11 +109,9 @@ class Car(pygame.sprite.Sprite):
   def reInit(self, track, rank):
     self.track = track
 
-    # Blink is used to warn the player
     self.blink = 0
     self.blinkCount = 0
 
-    # Rank is only used by the car to initilaize itself
     if rank == 0:
       self.x = 0
       self.y = 0
@@ -131,21 +133,17 @@ class Car(pygame.sprite.Sprite):
       self.ox = track.startX3
       self.oy = track.startY3
     else:
-      # Side 1
       if rank%2 == 1:
         precX = track.startX3
         precY = track.startY3
-        # Compute all positions from 3 to find the good one !
         for i in range(3, rank, 2):
           precX = precX + (track.startX2 - track.startX1)
           precY = precY + (track.startY2 - track.startY1)
           precX = precX + (track.startX3 - track.startX2)
           precY = precY + (track.startY3 - track.startY2)
-      # Side 2
       else:
         precX = track.startX2
         precY = track.startY2
-        # Compute all positions from 2 to find the good one !
         for i in range(2, rank, 2):
           precX = precX + (track.startX3 - track.startX2)
           precY = precY + (track.startY3 - track.startY2)
@@ -169,7 +167,6 @@ class Car(pygame.sprite.Sprite):
     self.speed = 0.0
     self.accel = 0.0
 
-    # Only useful for Collisions
     self.newSpeed = 0
 
     self.speedR = 0.0
@@ -179,6 +176,10 @@ class Car(pygame.sprite.Sprite):
     self.accelL = 0.0
 
     self.movepos = [0.0,0.0]
+
+    # DRIFT MECHANIC - Initialisation
+    self.drifting = False
+    self.driftIntensity = 0.0
 
   def update(self):
     ''' Function called at each frame to update car sprite...
@@ -201,12 +202,6 @@ class Car(pygame.sprite.Sprite):
     coord2 = (int(coordS[0] - sin_a * half_w), int(coordS[1] + cos_a * half_w))
     coord3 = (int(coordS[0] + sin_a * half_w), int(coordS[1] - cos_a * half_w))
 
-    #misc.screen.set_at(coord0, (255,0,255))
-    #misc.screen.set_at(coord1, (255,0,255))
-    #misc.screen.set_at(coord2, (255,0,255))
-    #misc.screen.set_at(coord3, (255,0,255))
-
-    # Construct the 4 Rects useful for collisions
     minXX = min(coord0[0], coord1[0], self.x)
     maxXX = max(coord0[0], coord1[0], self.x)
     minYY = min(coord0[1], coord1[1], self.y)
@@ -233,16 +228,6 @@ class Car(pygame.sprite.Sprite):
     
     self.listCarRect = (carRectN, carRectS, carRectE, carRectW)
 
-    #pygame.draw.rect(misc.screen, (255, 0, 0), self.listCarRect[0])
-    #pygame.draw.rect(misc.screen, (0, 255, 0), self.listCarRect[1])
-    #pygame.draw.rect(misc.screen, (0, 0, 255), self.listCarRect[2])
-    #pygame.draw.rect(misc.screen, (255, 0, 255), self.listCarRect[3])
-
-    #misc.screen.set_at(coordN, (255,255,0))
-    #misc.screen.set_at(coordS, (255,255,0))
-    #misc.screen.set_at(coordE, (255,255,0))
-    #misc.screen.set_at(coordW, (255,255,0))
-    
     if min(coord0) < 0 or coord0[0] > 1023*misc.zoom or coord0[1] > 767*misc.zoom:
       g0 = 0
     else:
@@ -262,16 +247,36 @@ class Car(pygame.sprite.Sprite):
 
     g = (g0 + g1 + g2 + g3)/4.0
 
-    # Hoist g/255.0 — used three times below
-    g_norm = g / 255.0
+    # ── DRIFT MECHANIC ──────────────────────────────────────────────────────
+    # Drift triggers when the car is going fast AND steering sharply.
+    # Lowered steer threshold to 0.4 so it triggers on normal sharp corners,
+    # not only at full lock. Speed threshold kept at 0.60 (60% of max speed).
+    DRIFT_SPEED_THRESHOLD = 0.60   # triggers at 60% of max speed
+    DRIFT_STEER_THRESHOLD = 0.40   # triggers at 40% of full steer input
 
-    #self.crashFlag=0
+    speedRatio = self.speed / self.maxSpeed if self.maxSpeed > 0 else 0
+    steerRatio = min(abs(self.angleW), 1.0)  
+
+    speedExcess = max(0.0, (speedRatio - DRIFT_SPEED_THRESHOLD) / (1.0 - DRIFT_SPEED_THRESHOLD))
+    steerExcess = max(0.0, (steerRatio - DRIFT_STEER_THRESHOLD) / (1.0 - DRIFT_STEER_THRESHOLD))
+
+    targetDriftIntensity = speedExcess * steerExcess
+
+    # Drift builds quickly (0.25) and fades slowly (0.88) for a natural feel.
+    if targetDriftIntensity > self.driftIntensity:
+      self.driftIntensity = 0.75 * self.driftIntensity + 0.25 * targetDriftIntensity  # fast build
+    else:
+      self.driftIntensity = 0.88 * self.driftIntensity + 0.12 * targetDriftIntensity  # slow fade
+
+    self.drifting = self.driftIntensity > 0.05
+
+    # Traction drops by 35% at full drift intensity 
+    DRIFT_TRACTION_REDUCTION = 0.35
+    tractionMultiplier = 1.0 - (self.driftIntensity * DRIFT_TRACTION_REDUCTION)
 
     # Compute Accel
-    # - Accel depends only on present datas
-    self.accel=self.power*(1.0*self.throttle-1.7*self.brake)*g_norm
+    self.accel = self.power * (1.0*self.throttle - 1.7*self.brake) * (g/255.0) * tractionMultiplier
 
-    # Engine brake
     if self.throttle == 0.0 and self.speed > 0:
       self.accel = self.accel - 0.005
     if self.throttle == 0.0 and self.speed < 0:
@@ -279,24 +284,22 @@ class Car(pygame.sprite.Sprite):
 
     oldSpeed = self.speed
 
-    # Compute Speed
-    # - Acceleration acts on the Speed
-    self.speed=self.speed+self.accel
+    self.speed = self.speed + self.accel
 
-    # Max back speed
-    if self.speed <= self.maxSpeedB*g_norm:
-      self.speed = self.maxSpeedB*g_norm
+
+    if self.speed <= self.maxSpeedB*(g/255.0):
+      self.speed = self.maxSpeedB*(g/255.0)
       self.accel = 0
 
-    # Max speed
-    if self.speed >= self.maxSpeed*g_norm:
-      self.speed = self.maxSpeed*g_norm
+    if self.speed >= self.maxSpeed*(g/255.0):
+      self.speed = self.maxSpeed*(g/255.0)
+
       self.accel = 0
     
-    # If speed is very slow, stop the car
     if self.speed < 0.005 and self.speed > -0.005:
       self.accel = 0.0
       self.speed = 0.0
+
 
     # Hoist per-frame constants for oversteer / braking thresholds
     _power_17 = self.power * 1.7
@@ -327,26 +330,20 @@ class Car(pygame.sprite.Sprite):
     #if self.accel >= 0:# and self.accelR > 0:
     #  self.accelR = self.accelR
 
-    if self.speed >= 0:
-      self.speedR=0.8*self.speedR+self.accelR
-    else:
-      self.speedR=0.8*self.speedR-self.accelR
 
-    # If the rotation is slow, stop the rotation
+    if self.speed >= 0:
+      self.speedR = 0.8*self.speedR + self.accelR
+    else:
+      self.speedR = 0.8*self.speedR - self.accelR
+
     if self.speedR < 0.003 and self.speedR > -0.003:
       self.accelR = 0.0
       self.speedR = 0.0
 
     oldoldAngle = self.oldAngle
-
     self.oldAngle = self.angle
-    
-    self.angle=self.angle+self.speedR
+    self.angle = self.angle + self.speedR
 
-    # Take in account of the oversteering at acceleration
-    # - Only acting when power is at the maximum
-    # - No memory so it's only acting on the angle
-    # - More the speed is near the max less this is effecting
     if self.accel == self.power and self.speed > 0:
       self.angle = self.angle + 0.1*self.speedR*(1.5*self.maxSpeed-self.speed)
 
@@ -374,26 +371,35 @@ class Car(pygame.sprite.Sprite):
       self.accelL = self.accelL * (1 + 1.3*_abs_accel/_power_17)
       self.speed = self.speed - 0.6*_abs_accel
 
+    # ── DRIFT MECHANIC - Professor lerp formula ──────────────────────────────
+    # newXvel = alpha * P.x + (1 - alpha) * C.x
+    # P.x  = forward speed (where the car wants to go)
+    # C.x  = current lateral speed (where the car is sliding)
+    # alpha = 0.65 → car keeps 35% of the slide for a visible real drift
+    # Old alpha was 0.8 → only 20% slide, felt like mild understeer not a drift
+    if self.drifting:
+      ALPHA = 0.65
+      # Target is 0.0 so lateral slip decays naturally 
+      self.speedL = ALPHA * 0.0 + (1.0 - ALPHA) * self.speedL
+
     self.speedL = 0.2*self.speedL + self.accelL
 
-    # If the speed is too slow
     if self.speedL < 0.003 and self.speedL > -0.003:
       self.speedL = 0.0
 
-    # Make some corrections
-    if self.angle<0: 
-      self.angle=self.angle+2.0*math.pi
-    if self.angle>2.0*math.pi:
-      self.angle=self.angle-2.0*math.pi;
+    if self.angle < 0: 
+      self.angle = self.angle + 2.0*math.pi
+    if self.angle > 2.0*math.pi:
+      self.angle = self.angle - 2.0*math.pi
 
     oldoldx = self.ox
     oldoldy = self.oy
     self.ox = self.x
     self.oy = self.y
 
-    self.speed = self.speed*misc.zoom
-    self.speedL = self.speedL*misc.zoom
-    self.speedR = self.speedR*misc.zoom
+    self.speed  = self.speed  * misc.zoom
+    self.speedL = self.speedL * misc.zoom
+    self.speedR = self.speedR * misc.zoom
     
     # Compute position update — hoist sqrt and acos to avoid 4 redundant calls
     if self.speedL != 0.0:
@@ -406,70 +412,66 @@ class Car(pygame.sprite.Sprite):
       self.x -= math.cos(self.angle) * self.speed
       self.y -= math.sin(self.angle) * self.speed
 
-    self.speed = self.speed/misc.zoom
-    self.speedL = self.speedL/misc.zoom
-    self.speedR = self.speedR/misc.zoom
+    self.speed  = self.speed  / misc.zoom
+    self.speedL = self.speedL / misc.zoom
+    self.speedR = self.speedR / misc.zoom
 
     # Collision -> move to the last Nice position
-    #if self.track.track.get_rect().contains(self.rect) == False:
     if (self.x < 16*misc.zoom or self.x > 1024*misc.zoom-14*misc.zoom or self.y < 16*misc.zoom or self.y > 768*misc.zoom-14*misc.zoom) or g0 == 0 or g1 == 0 or g2 == 0 or g3 == 0:
       self.x = oldoldx
       self.y = oldoldy
       self.angle = oldoldAngle
       self.speed = -0.2*oldSpeed
       self.speedL = 0
+      # Cancel drift on collision
+      self.driftIntensity = 0.0
+      self.drifting = False
 
-    #print math.sqrt((self.x-self.ox)*(self.x-self.ox)+(self.y-self.oy)*(self.y-self.oy))
-
-    self.movepos[0]=int(self.x) - int(self.ox)
-    self.movepos[1]=int(self.y) - int(self.oy)
+    self.movepos[0] = int(self.x) - int(self.ox)
+    self.movepos[1] = int(self.y) - int(self.oy)
 
     self.rect.move_ip(self.movepos)
-    #self.rect=pygame.Rect(int(self.x-self.sizeRect/2), int(self.y-self.sizeRect/2), self.sizeRect, self.sizeRect)
 
     if self.rect != (int(self.x-self.sizeRect/2), int(self.y-self.sizeRect/2), self.sizeRect, self.sizeRect):
-      print("PROBLEM")
-      print(self.rect)
-      print(self.x)
-      print(self.y)
+      pass
+      
 
     self.slide = 0
     # Compute tires slide
-    if (self.accel >= 0.015 and self.speed <= 2 and self.speed>0) or self.accelL > 0.4 or self.accelL < -0.4:
+    if (self.accel >= 0.015 and self.speed <= 2 and self.speed > 0) or self.accelL > 0.4 or self.accelL < -0.4:
       self.slide = 1
-    # If the car is braking, the slide is larger
     if self.accel < -0.005:
       self.slide = 2
-    
-    #print self.movepos
-    #print "xy %f %f %f thbr %f %f aW %f s %f acc %f sR %f accR %f spdL %f accelL %f " \
-    #  % (self.x, self.y, self.angle, self.brake, self.throttle, self.angleW, self.speed, self.accel, self.speedR, self.accelR, self.speedL, self.accelL)
+
+    # Tire marks appear during drift when intensity is above 0.2
+    if self.drifting and self.driftIntensity > 0.2:
+      self.slide = 2
 
   def doAccel(self):
-    self.throttle=self.throttle+0.1
-    if self.throttle>1:
-      self.throttle=1
+    self.throttle = self.throttle + 0.1
+    if self.throttle > 1:
+      self.throttle = 1
 
   def noAccel(self):
-    self.throttle=self.throttle-0.05
-    if self.throttle<0:
-      self.throttle=0
+    self.throttle = self.throttle - 0.05
+    if self.throttle < 0:
+      self.throttle = 0
 
   def doBrake(self):
-    self.brake=self.brake+0.2
-    if self.brake>1:
-      self.brake=1
+    self.brake = self.brake + 0.2
+    if self.brake > 1:
+      self.brake = 1
 
   def noBrake(self):
-    self.brake=0
+    self.brake = 0
 
   def doLeft(self):
-    self.angleW=self.angleW-0.2
+    self.angleW = self.angleW - 0.2
     if self.angleW < -1:
       self.angleW = -1
 
   def doRight(self):
-    self.angleW=self.angleW+0.2
+    self.angleW = self.angleW + 0.2
     if self.angleW > 1:
       self.angleW = 1
 

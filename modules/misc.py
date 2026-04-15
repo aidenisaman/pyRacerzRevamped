@@ -65,6 +65,10 @@ def init():
 
   background = pygame.transform.scale(pygame.image.load(os.path.join("sprites", "background.png")).convert(), (int(1024*zoom), int(768*zoom)))
 
+  # Enable key repeat so held backspace/letters repeat in text-entry menus
+  # (400 ms initial delay, 50 ms repeat interval)
+  pygame.key.set_repeat(400, 50)
+
 def chrono2Str(chrono):
   return str(chrono/100.0).replace(".", "''")
 
@@ -251,8 +255,9 @@ class TextInput:
   Supported keys: K_a–K_z (uppercased), K_0–K_9, K_BACKSPACE.
   """
 
-  def __init__(self, max_length: int, initial: str = "") -> None:
-    self.max_length = max_length
+  def __init__(self, max_length: int, initial: str = "", allow_space: bool = False) -> None:
+    self.max_length  = max_length
+    self.allow_space = allow_space
     self.text = initial[:max_length]
 
   def feed_key(self, key) -> bool:
@@ -269,6 +274,10 @@ class TextInput:
       if len(self.text) < self.max_length:
         self.text += pygame.key.name(key)
         return True
+    elif key == K_SPACE and self.allow_space:
+      if len(self.text) < self.max_length:
+        self.text += " "
+        return True
     return False
 
   def render_text(self) -> str:
@@ -278,8 +287,33 @@ class TextInput:
     return self.text
 
 
-def setUnlockLevel(lck):
+class IPTextInput(TextInput):
+  """TextInput variant for IPv4 address entry.
 
+  Accepts digits (0-9) and dots (.) only; letters are ignored.
+  Max length defaults to 15 ("255.255.255.255").
+  """
+
+  def __init__(self, max_length: int = 15, initial: str = "") -> None:
+    super().__init__(max_length, initial, allow_space=False)
+
+  def feed_key(self, key) -> bool:
+    if key == K_BACKSPACE:
+      if self.text:
+        self.text = self.text[:-1]
+        return True
+    elif K_0 <= key <= K_9:
+      if len(self.text) < self.max_length:
+        self.text += pygame.key.name(key)
+        return True
+    elif key == K_PERIOD:
+      if len(self.text) < self.max_length and not self.text.endswith("."):
+        self.text += "."
+        return True
+    return False
+
+
+def setUnlockLevel(lck):
   # Only change the unlock level if it's better than the actual one
   if getUnlockLevel() >= lck:
     return

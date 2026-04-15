@@ -790,6 +790,361 @@ class ChooseRobotPlayerMenu(Menu):
 
     pygame.display.flip()
 
+
+# ===========================================================================
+# Network multiplayer menus
+# ===========================================================================
+
+def _net_menu_loop(refresh_cb, handle_keydown, poll_network):
+  """Like _menu_loop but also calls poll_network() each iteration.
+
+  poll_network() may return:
+    "refresh"  – trigger a redraw and keep looping
+    non-None   – exit the loop and return that value
+    None       – nothing to do this tick
+  """
+  refresh_cb()
+  while True:
+    for event in pygame.event.get():
+      if event.type == QUIT:
+        sys.exit(0)
+      elif event.type == KEYDOWN:
+        result = handle_keydown(event.key)
+        if result == "refresh":
+          refresh_cb()
+        elif result is not None:
+          return result
+    net_result = poll_network()
+    if net_result == "refresh":
+      refresh_cb()
+    elif net_result is not None:
+      return net_result
+    pygame.time.delay(10)
+
+
+class NetworkModeMenu(Menu):
+  """Two-button menu: Host or Join."""
+
+  def __init__(self, titleFont, itemFont):
+    Menu.__init__(self, titleFont, "Network Multiplayer")
+    self._itemFont = itemFont
+    titleMenu    = SimpleTitleOnlyMenu(self.titleFont, self.title)
+    self.startY  = titleMenu.startY
+    self.select  = 1
+
+  def getInput(self):
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return "back"
+      if key in (K_UP, K_DOWN):
+        self.select = 2 if self.select == 1 else 1
+        return "refresh"
+      if key == K_RETURN:
+        return "host" if self.select == 1 else "join"
+      return None
+
+    return _menu_loop(self.refresh, handle_key)
+
+  def refresh(self):
+    y = self.startY
+    for idx, label in enumerate(["Host a Lobby", "Join a Lobby"], start=1):
+      color = misc.lightColor if idx == self.select else misc.darkColor
+      surf  = self._itemFont.render(label, 1, color)
+      r     = surf.get_rect()
+      r.centerx = _screen_rect().centerx
+      r.y = y
+      _clear_row(r.y, r.height)
+      misc.screen.blit(surf, r)
+      y += r.height + int(20 * misc.zoom)
+    pygame.display.flip()
+
+
+class NetworkIPMenu(Menu):
+  """Enter the host IP address (digits + dots only)."""
+
+  def __init__(self, titleFont, itemFont):
+    Menu.__init__(self, titleFont, "Enter Host IP")
+    self._itemFont = itemFont
+    titleMenu   = SimpleTitleOnlyMenu(self.titleFont, self.title)
+    self.startY = titleMenu.startY
+    self._input = misc.IPTextInput(15)
+
+  def getInput(self):
+    def handle_key(key):
+      if key == K_ESCAPE:
+        return None          # cancelled
+      if key == K_RETURN:
+        ip = self._input.text.strip(".")
+        return ip if ip else None
+      if self._input.feed_key(key):
+        return "refresh"
+      return None
+
+    return _menu_loop(self.refresh, handle_key)
+
+  def refresh(self):
+    y = self.startY
+    surf = self._itemFont.render(self._input.render_text(), 1, misc.lightColor)
+    r    = surf.get_rect()
+    r.centerx = _screen_rect().centerx
+    r.y = y
+    _clear_row(r.y, r.height)
+    misc.screen.blit(surf, r)
+    y += r.height + int(10 * misc.zoom)
+    hint = misc.popUpFont.render("[ENTER] Connect   [ESC] Back", 1, misc.darkColor)
+    hr   = hint.get_rect()
+    hr.centerx = _screen_rect().centerx
+    hr.y = y
+    misc.screen.blit(hint, hr)
+    pygame.display.flip()
+
+
+class NetworkLobbyMenu(Menu):
+  """Lobby screen shown to both host and clients.
+
+  Parameters
+  ----------
+  net_obj    : NetworkServer (is_host=True) or NetworkClient (is_host=False)
+  is_host    : bool
+  local_name : str   – this player's display name
+  track_name : str   – (host only) track chosen for next race
+  track_rev  : int   – (host only) 0 = normal, 1 = reverse
+
+  Return value (dict)
+  -------------------
+  {"action": "start",  ...race info...}   – start race
+  {"action": "close"}                     – host closed the lobby
+  {"action": "leave"}                     – client left
+  """
+
+  _MAX_CHAT   = 10    # lines kept in chat log
+  _ROW_H      = int(28 * 1)   # approx; scaled at refresh time
+
+  def __init__(self, net_obj, is_host, local_name,
+               track_name="city", track_rev=0,
+               host_color=1, host_level=1, laps=3):
+    Menu.__init__(self, misc.titleFont, "Lobby")
+    self._net        = net_obj
+    self._is_host    = is_host
+    self._local_name = local_name
+    self._track_name = track_name
+    self._track_rev  = track_rev
+    self._host_color = host_color
+    self._host_level = host_level
+    self._laps       = laps
+
+    self._players   = [local_name]   # roster; updated by server broadcasts
+    self._chat_log  = []
+    self._chat_in   = misc.TextInput(48, allow_space=True)
+    self._is_typing = False
+
+    # Resolve local LAN IP once so refresh() can display it
+    try:
+      import socket as _socket
+      _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+      _s.connect(("8.8.8.8", 80))
+      self._local_ip = _s.getsockname()[0]
+      _s.close()
+    except Exception:
+      self._local_ip = "unknown"
+
+    SimpleTitleOnlyMenu(misc.titleFont, "Network Lobby")
+
+  # ------------------------------------------------------------------
+  def getInput(self):
+    return _net_menu_loop(self.refresh, self._handle_key, self._poll_net)
+
+  # ------------------------------------------------------------------
+  def _handle_key(self, key):
+    if self._is_typing:
+      if key == K_RETURN:
+        text = self._chat_in.text.strip()
+        if text:
+          msg = {"type": "chat", "sender": self._local_name, "text": text}
+          if self._is_host:
+            self._net.broadcast(msg)
+            self._chat_log.append(self._local_name + ": " + text)
+          else:
+            self._net.send(msg)
+        self._chat_in   = misc.TextInput(48, allow_space=True)
+        self._is_typing = False
+        return "refresh"
+      if key == K_ESCAPE:
+        self._chat_in   = misc.TextInput(48, allow_space=True)
+        self._is_typing = False
+        return "refresh"
+      if self._chat_in.feed_key(key):
+        return "refresh"
+      return None
+
+    # not typing
+    if key == K_t:
+      self._is_typing = True
+      return "refresh"
+    if key == K_ESCAPE:
+      if self._is_host:
+        self._net.broadcast({"type": "finish"})
+        self._net.stop()
+        return {"action": "close"}
+      else:
+        self._net.send({"type": "bye"})
+        self._net.disconnect()
+        return {"action": "leave"}
+    if key == K_s and self._is_host:
+      # Start race: broadcast start message then return
+      self._net.broadcast({
+        "type":       "start",
+        "track":      self._track_name,
+        "reverse":    self._track_rev,
+        "laps":       self._laps,
+        "host_name":  self._local_name,
+        "host_color": self._host_color,
+        "host_level": self._host_level,
+        "roster":     self._net.get_player_list(),
+      })
+      return {"action": "start"}
+    return None
+
+  # ------------------------------------------------------------------
+  def _poll_net(self):
+    """Process incoming network messages; return "refresh" or a result dict."""
+    changed = False
+    result  = None
+
+    for msg in self._net.recv_all():
+      mtype = msg.get("type")
+
+      if mtype == "hello" and self._is_host:
+        name   = msg.get("name", "unknown")
+        color  = msg.get("color", 1)
+        level  = msg.get("level", 1)
+        cidx   = msg.get("_client_idx", 0)
+        self._net.register_player(cidx, name, color, level)
+        if name not in self._players:
+          self._players.append(name)
+        self._chat_log.append("*** " + name + " joined ***")
+        self._net.broadcast({
+          "type":   "players",
+          "list":   self._players,
+          "roster": self._net.get_player_list(),
+        })
+        changed = True
+
+      elif mtype == "players" and not self._is_host:
+        self._players = msg.get("list", self._players)
+        changed = True
+
+      elif mtype == "chat":
+        entry = msg.get("sender", "?") + ": " + msg.get("text", "")
+        self._chat_log = self._chat_log[-self._MAX_CHAT:]
+        self._chat_log.append(entry)
+        if self._is_host:
+          # Re-broadcast so all clients see it
+          self._net.broadcast(msg)
+        changed = True
+
+      elif mtype == "bye" and self._is_host:
+        name = msg.get("name", "?")
+        self._players = [p for p in self._players if p != name]
+        self._chat_log.append("*** " + name + " left ***")
+        self._net.broadcast({
+          "type":   "players",
+          "list":   self._players,
+          "roster": self._net.get_player_list(),
+        })
+        changed = True
+
+      elif mtype == "start" and not self._is_host:
+        result = {
+          "action":     "start",
+          "track":      msg.get("track", "city"),
+          "reverse":    msg.get("reverse", 0),
+          "laps":       msg.get("laps", 3),
+          "host_name":  msg.get("host_name", "HOST"),
+          "host_color": msg.get("host_color", 1),
+          "host_level": msg.get("host_level", 1),
+          "roster":     msg.get("roster", []),
+        }
+
+      elif mtype == "finish" and not self._is_host:
+        # Host closed the lobby — leave gracefully
+        self._net.disconnect()
+        result = {"action": "leave"}
+
+    if result:
+      return result
+    return "refresh" if changed else None
+
+  # ------------------------------------------------------------------
+  def refresh(self):
+    sw = _screen_rect().width
+
+    # Background
+    misc.screen.blit(misc.background, (0, 0))
+
+    # Title + separator already drawn by SimpleTitleOnlyMenu in __init__;
+    # re-draw them here so refresh works after the initial display.
+    y = 10
+    title_surf = misc.titleFont.render("Network Lobby", 1, misc.lightColor)
+    title_r    = title_surf.get_rect()
+    title_r.centerx = sw // 2
+    title_r.y = y
+    misc.screen.blit(title_surf, title_r)
+    y += title_r.height
+
+    sep_surf = misc.titleFont.render("...............", 1, misc.lightColor)
+    sep_r    = sep_surf.get_rect()
+    sep_r.centerx = sw // 2
+    sep_r.y = y
+    misc.screen.blit(sep_surf, sep_r)
+    y += sep_r.height + int(6 * misc.zoom)
+
+    # ── Players ──────────────────────────────────────────────────────
+    hdr = misc.itemFont.render("Players:", 1, misc.lightColor)
+    misc.screen.blit(hdr, (int(30 * misc.zoom), y))
+    y += hdr.get_height() + int(4 * misc.zoom)
+
+    for name in self._players:
+      marker = "> " if name == self._local_name else "  "
+      psurf  = misc.smallItemFont.render(marker + name, 1, misc.lightColor)
+      misc.screen.blit(psurf, (int(50 * misc.zoom), y))
+      y += psurf.get_height() + int(2 * misc.zoom)
+
+    y += int(10 * misc.zoom)
+
+    # ── Chat log ─────────────────────────────────────────────────────
+    chat_hdr = misc.itemFont.render("Chat:", 1, misc.lightColor)
+    misc.screen.blit(chat_hdr, (int(30 * misc.zoom), y))
+    y += chat_hdr.get_height() + int(4 * misc.zoom)
+
+    for line in self._chat_log[-self._MAX_CHAT:]:
+      lsurf = misc.popUpFont.render(line[:64], 1, misc.lightColor, (0, 0, 0))
+      misc.screen.blit(lsurf, (int(30 * misc.zoom), y))
+      y += lsurf.get_height() + int(2 * misc.zoom)
+
+    # ── Chat input bar ───────────────────────────────────────────────
+    input_y = int(misc.screen.get_height() * 0.85)
+    if self._is_typing:
+      in_surf = misc.popUpFont.render("> " + self._chat_in.render_text(), 1, (255, 255, 180), (0, 0, 0))
+    else:
+      in_surf = misc.popUpFont.render("", 1, misc.lightColor)
+    misc.screen.blit(in_surf, (int(30 * misc.zoom), input_y))
+
+    # ── Footer instructions ──────────────────────────────────────────
+    foot_y = int(misc.screen.get_height() * 0.92)
+    if self._is_host:
+      foot = "[S] Start Race   [T] Chat   [ESC] Close Lobby"
+      ip_text = "Your IP: " + self._local_ip
+      ip_surf = misc.popUpFont.render(ip_text, 1, misc.darkColor, (0, 0, 0))
+      misc.screen.blit(ip_surf, (int(30 * misc.zoom), foot_y - ip_surf.get_height() - 4))
+    else:
+      foot = "[T] Chat   [ESC] Leave"
+    foot_surf = misc.popUpFont.render(foot, 1, misc.darkColor, (0, 0, 0))
+    misc.screen.blit(foot_surf, (int(30 * misc.zoom), foot_y))
+
+    pygame.display.flip()
+
+
 class MenuText(Menu):
   '''Menu to display Text only'''
 
