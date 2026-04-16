@@ -354,7 +354,13 @@ def main():
           elif result["action"] == "start":
             currentTrack = track.Track(trackInfo[0], trackInfo[1])
             misc.startRandomMusic()
-            netgame.NetworkHostRace(srv, thePlayer, currentTrack, laps).run()
+            netgame.NetworkHostRace(
+              srv,
+              thePlayer,
+              currentTrack,
+              laps,
+              remote_player_infos=result.get("roster", []),
+            ).run()
             misc.stopMusic()
             # Loop back to lobby for another race
 
@@ -362,6 +368,12 @@ def main():
       elif net_mode == "join":
         ip = menu.NetworkIPMenu(misc.titleFont, misc.itemFont).getInput()
         if not ip:
+          continue
+
+        joinPlayer = menu.ChooseHumanPlayerMenu(
+          misc.titleFont, "network: choosePlayer",
+          5 * misc.zoom, misc.itemFont).getInput()
+        if joinPlayer == -1:
           continue
 
         playerName = menu.ChooseTextMenu(
@@ -378,7 +390,12 @@ def main():
           misc.wait4Key()
           continue
 
-        cli.send({"type": "hello", "name": playerName})
+        cli.send({
+          "type": "hello",
+          "name": playerName,
+          "color": joinPlayer.car.color,
+          "level": joinPlayer.car.level,
+        })
 
         # Lobby → Watch loop (cycles until client leaves)
         while True:
@@ -392,17 +409,29 @@ def main():
             break   # cli already disconnected inside lobby
 
           elif result["action"] == "start":
+            host_info = {
+              "pid": 0,
+              "name": result["host_name"],
+              "color": result["host_color"],
+              "level": result["host_level"],
+            }
+            roster = [host_info] + [p for p in result.get("roster", []) if p.get("pid", 0) != 0]
+
+            # Fallback assignment if assigned packet arrived late.
+            if cli.player_id < 0:
+              for info in roster:
+                if info.get("name") == playerName and info.get("color") == joinPlayer.car.color:
+                  cli.player_id = info.get("pid", -1)
+                  break
+
             misc.startRandomMusic()
-            netgame.NetworkWatchRace(
+            netgame.NetworkClientRace(
               cli,
-              spectator_name=playerName,
-              host_name=result["host_name"],
-              host_color=result["host_color"],
-              host_level=result["host_level"],
+              joinPlayer,
               track_name=result["track"],
               track_reverse=result["reverse"],
+              remote_player_infos=roster,
               laps=result["laps"],
-              remote_player_infos=result.get("roster", []),
             ).run()
             misc.stopMusic()
             # Loop back to lobby for another race
