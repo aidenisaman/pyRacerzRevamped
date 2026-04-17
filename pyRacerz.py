@@ -353,7 +353,7 @@ def main():
 
           elif result["action"] == "start":
             currentTrack = track.Track(trackInfo[0], trackInfo[1])
-            misc.startRandomMusic()
+            #misc.startRandomMusic()
             netgame.NetworkHostRace(
               srv,
               thePlayer,
@@ -424,7 +424,7 @@ def main():
                   cli.player_id = info.get("pid", -1)
                   break
 
-            misc.startRandomMusic()
+            #misc.startRandomMusic()
             netgame.NetworkClientRace(
               cli,
               joinPlayer,
