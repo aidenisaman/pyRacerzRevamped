@@ -53,6 +53,7 @@ def _blit_center(surf, y):
 
 
 def _menu_loop(refresh_cb, handle_keydown):
+  pygame.event.clear()
   """Shared event loop for menu screens.
 
   refresh_cb: callable that redraws the menu state.
@@ -128,43 +129,55 @@ class SimpleMenu(Menu):
     return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
+      misc.screen.blit(self.background, (0, 0))
 
-    # Calculate total height of menu items
-    item_height = self.itemFont.get_height()
-    total_items = len(self.listItem)
-    total_height = total_items * item_height + (total_items - 1) * self.gap
-    screen_h = int(768 * misc.zoom)
-    center_y = (screen_h - total_height) // 2
-    y = center_y - 10  # Move up a little
+      # overlay for readability
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
 
-    i = 1
+      center_x = _screen_rect().centerx
 
-    # Print the menu items
-    for item in self.listItem:
-      if i == self.select:
-        text = self.itemFont.render(item, True, misc.lightColor)
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+
+      if self.background == misc.main_menu_background:
+          title_rect.y = int(680 * misc.zoom)
       else:
-        text = self.itemFont.render(item, 1, misc.darkColor)
-      textRect = text.get_rect()
-      textRect.centerx = _screen_rect().centerx
-      textRect.y = y
+          title_rect.y = 20
 
-      # 1. Clear the row
-      _clear_row(textRect.y, textRect.height, self.background)
+      misc.screen.blit(title_text, title_rect)
 
+      # Calculate total height of menu items
+      item_height = self.itemFont.get_height()
+      total_items = len(self.listItem)
+      total_height = total_items * item_height + (total_items - 1) * self.gap
+      screen_h = int(768 * misc.zoom)
+      center_y = (screen_h - total_height) // 2
+      y = center_y - 10
 
-      # 3. Draw shadow
-      shadow = self.itemFont.render(item, True, (0, 0, 0))
-      misc.screen.blit(shadow, (textRect.x + 2, textRect.y + 2))
+      # Print the menu items
+      for i, item in enumerate(self.listItem, start=1):
+          if i == self.select:
+              text = self.itemFont.render(item, True, misc.lightColor)
+          else:
+              text = self.itemFont.render(item, True, misc.darkColor)
 
-      # 4. Draw text
-      misc.screen.blit(text, textRect)
-      y = y + textRect.height + self.gap
-      i = i + 1
+          text_rect = text.get_rect()
+          text_rect.centerx = center_x
+          text_rect.y = y
 
-    pygame.display.flip()
+          shadow = self.itemFont.render(item, True, (0, 0, 0))
+          misc.screen.blit(shadow, (text_rect.x + 2, text_rect.y + 2))
+          misc.screen.blit(text, text_rect)
 
+          y = y + text_rect.height + self.gap
 
+      pygame.display.flip()
+      
 class SimpleTitleOnlyMenu(Menu):
   '''Menu only with a title'''
 
@@ -172,43 +185,41 @@ class SimpleTitleOnlyMenu(Menu):
 
     Menu.__init__(self, titleFont, title, background)
 
-    # Put the background
+    # Full background redraw
     misc.screen.blit(self.background, (0, 0))
+
     overlay = pygame.Surface(misc.screen.get_size())
     overlay.set_alpha(80)
     overlay.fill((0, 0, 0))
     misc.screen.blit(overlay, (0, 0))
 
-    # Put title at different positions depending on which background is used
+    # Title position
     if self.background == misc.main_menu_background:
-        y = int(680 * misc.zoom)   # landing page title near bottom
+      y = int(680 * misc.zoom)
     else:
-        y = 10                     # all other menus stay at top
+      y = 10
 
-    # Print the title
-    textTitle = self.titleFont.render(self.title, 1, misc.lightColor)
+    # Draw title
+    textTitle = self.titleFont.render(self.title, True, misc.lightColor)
     textRectTitle = textTitle.get_rect()
     textRectTitle.centerx = _screen_rect().centerx
     textRectTitle.y = y
+    misc.screen.blit(textTitle, textRectTitle)
+
     y = y + textRectTitle.height / 2
 
-    # Print the dotted line only for non-landing pages
+    # Dotted line only for non-landing pages
     if self.background == misc.main_menu_background:
-        text = self.titleFont.render("", 1, misc.lightColor)
+      text = self.titleFont.render("", True, misc.lightColor)
     else:
-        text = self.titleFont.render("...............", 1, misc.lightColor)
+      text = self.titleFont.render("...............", True, misc.lightColor)
 
     textRect = text.get_rect()
     textRect.centerx = _screen_rect().centerx
     textRect.y = y
-    _clear_row(textRectTitle.y, textRectTitle.height, self.background)
-    _clear_row(textRect.y, textRect.height, self.background)
-
-    misc.screen.blit(textTitle, textRectTitle)
     misc.screen.blit(text, textRect)
 
     y = y + textRect.height
-
     self.startY = y
 
     pygame.display.flip()
@@ -297,7 +308,22 @@ class ChooseTrackMenu(Menu):
     
     def refresh(self):
       misc.screen.blit(self.background, (0, 0))
-      titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
+
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
+
+      center_x = _screen_rect().centerx
+
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
+
+      y_start = title_rect.bottom + int(30 * misc.zoom)
 
       slot_w = int(210 * misc.zoom)
       slot_h = int(170 * misc.zoom)
@@ -312,52 +338,49 @@ class ChooseTrackMenu(Menu):
       gap_y = int(35 * misc.zoom)
       cols = 4
 
-      screen_rect = misc.screen.get_rect()
-      grid_start_y = self.startY + int(80 * misc.zoom)
-
       total_grid_w = cols * slot_w + (cols - 1) * gap_x
-      start_x = (screen_rect.width - total_grid_w) // 2
+      start_x = (_screen_rect().width - total_grid_w) // 2
 
       for idx, iconTrack in enumerate(self.listIconTracks):
-        row = idx // cols
-        col = idx % cols
+          row = idx // cols
+          col = idx % cols
 
-        slot_x = start_x + col * (slot_w + gap_x)
-        slot_y = grid_start_y + row * (slot_h + gap_y)
+          slot_x = start_x + col * (slot_w + gap_x)
+          slot_y = y_start + row * (slot_h + gap_y)
 
-        slot_rect = pygame.Rect(slot_x, slot_y, slot_w, slot_h)
+          slot_rect = pygame.Rect(slot_x, slot_y, slot_w, slot_h)
 
-        display_name = self.listAvailableTrackNames[idx].capitalize()
-        if idx + 1 == self.select and self.reverse == 1:
-          display_name += " REV"
+          display_name = self.listAvailableTrackNames[idx].capitalize()
+          if idx + 1 == self.select and self.reverse == 1:
+              display_name += " REV"
 
-        if idx + 1 == self.select:
-          draw_w = selected_w
-          draw_h = selected_h
-          border_color = misc.lightColor
-          border_width = 4
-          text_color = misc.lightColor
-        else:
-          draw_w = tile_w
-          draw_h = tile_h
-          border_color = misc.darkColor
-          border_width = 2
-          text_color = misc.darkColor
+          if idx + 1 == self.select:
+              draw_w = selected_w
+              draw_h = selected_h
+              border_color = misc.lightColor
+              border_width = 4
+              text_color = misc.lightColor
+          else:
+              draw_w = tile_w
+              draw_h = tile_h
+              border_color = misc.darkColor
+              border_width = 2
+              text_color = misc.darkColor
 
-        draw_x = slot_rect.centerx - draw_w // 2
-        draw_y = slot_rect.y + int(8 * misc.zoom)
+          draw_x = slot_rect.centerx - draw_w // 2
+          draw_y = slot_rect.y + int(8 * misc.zoom)
 
-        scaled_icon = pygame.transform.scale(iconTrack, (draw_w, draw_h))
-        icon_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+          scaled_icon = pygame.transform.scale(iconTrack, (draw_w, draw_h))
+          icon_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
 
-        misc.screen.blit(scaled_icon, icon_rect)
-        pygame.draw.rect(misc.screen, border_color, icon_rect, border_width)
+          misc.screen.blit(scaled_icon, icon_rect)
+          pygame.draw.rect(misc.screen, border_color, icon_rect, border_width)
 
-        label = self.itemFont.render(display_name, True, text_color)
-        label_rect = label.get_rect()
-        label_rect.centerx = slot_rect.centerx
-        label_rect.y = slot_rect.y + tile_h + int(20 * misc.zoom)
-        misc.screen.blit(label, label_rect)
+          label = self.itemFont.render(display_name, True, text_color)
+          label_rect = label.get_rect()
+          label_rect.centerx = slot_rect.centerx
+          label_rect.y = slot_rect.y + tile_h + int(20 * misc.zoom)
+          misc.screen.blit(label, label_rect)
 
       pygame.display.flip()
 
@@ -423,55 +446,67 @@ class ChooseValueMenu(Menu):
     return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
-    misc.screen.blit(self.background, (0, 0))
-    titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
+      misc.screen.blit(self.background, (0, 0))
 
-    tile_w = int(100 * misc.zoom)
-    tile_h = int(100 * misc.zoom)
-    selected_w = int(115 * misc.zoom)
-    selected_h = int(115 * misc.zoom)
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
 
-    gap_x = int(25 * misc.zoom)
-    gap_y = int(35 * misc.zoom)
-    cols = 4
+      center_x = _screen_rect().centerx
 
-    values = list(range(self.vMin, self.vMax + 1))
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
 
-    screen_rect = misc.screen.get_rect()
-    grid_start_y = self.startY + int(100 * misc.zoom)
+      tile_w = int(100 * misc.zoom)
+      tile_h = int(100 * misc.zoom)
+      selected_w = int(115 * misc.zoom)
+      selected_h = int(115 * misc.zoom)
 
-    total_grid_w = cols * tile_w + (cols - 1) * gap_x
-    start_x = (screen_rect.width - total_grid_w) // 2
+      gap_x = int(25 * misc.zoom)
+      gap_y = int(35 * misc.zoom)
+      cols = 4
 
-    for idx, value in enumerate(values):
-      row = idx // cols
-      col = idx % cols
+      values = list(range(self.vMin, self.vMax + 1))
 
-      x = start_x + col * (tile_w + gap_x)
-      y = grid_start_y + row * (tile_h + gap_y)
+      grid_start_y = title_rect.bottom + int(40 * misc.zoom)
 
-      if value == self.select:
-        draw_w = selected_w
-        draw_h = selected_h
-        draw_x = x - (selected_w - tile_w) // 2
-        draw_y = y - int(8 * misc.zoom)
+      total_grid_w = cols * tile_w + (cols - 1) * gap_x
+      start_x = (_screen_rect().width - total_grid_w) // 2
 
-        rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        pygame.draw.rect(misc.screen, misc.lightColor, rect, 4)
+      for idx, value in enumerate(values):
+          row = idx // cols
+          col = idx % cols
 
-        text = self.itemFont.render(str(value), True, misc.lightColor)
-        text_rect = text.get_rect(center=rect.center)
-        misc.screen.blit(text, text_rect)
+          x = start_x + col * (tile_w + gap_x)
+          y = grid_start_y + row * (tile_h + gap_y)
 
-      else:
-        rect = pygame.Rect(x, y, tile_w, tile_h)
-        pygame.draw.rect(misc.screen, misc.darkColor, rect, 2)
+          if value == self.select:
+              draw_w = selected_w
+              draw_h = selected_h
+              draw_x = x - (selected_w - tile_w) // 2
+              draw_y = y - int(8 * misc.zoom)
 
-        text = self.itemFont.render(str(value), True, misc.darkColor)
-        text_rect = text.get_rect(center=rect.center)
-        misc.screen.blit(text, text_rect)
+              rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+              pygame.draw.rect(misc.screen, misc.lightColor, rect, 4)
 
-    pygame.display.flip()
+              text = self.itemFont.render(str(value), True, misc.lightColor)
+              text_rect = text.get_rect(center=rect.center)
+              misc.screen.blit(text, text_rect)
+
+          else:
+              rect = pygame.Rect(x, y, tile_w, tile_h)
+              pygame.draw.rect(misc.screen, misc.darkColor, rect, 2)
+
+              text = self.itemFont.render(str(value), True, misc.darkColor)
+              text_rect = text.get_rect(center=rect.center)
+              misc.screen.blit(text, text_rect)
+
+      pygame.display.flip()
 
 class SingleRaceSetupMenu(Menu):
   '''Combined setup menu for single race'''
@@ -596,6 +631,7 @@ class SingleRaceSetupMenu(Menu):
 
     center_x = _screen_rect().centerx
 
+    # Title
     title_y = 20
     title_text = self.titleFont.render(self.title, True, misc.lightColor)
     title_rect = title_text.get_rect()
@@ -605,6 +641,7 @@ class SingleRaceSetupMenu(Menu):
 
     y = title_rect.bottom + int(25 * misc.zoom)
 
+    # Track preview
     preview = self.listIconTracks[self.track_index]
     preview_rect = preview.get_rect()
     preview_rect.centerx = center_x
@@ -618,9 +655,9 @@ class SingleRaceSetupMenu(Menu):
     )
     pygame.draw.rect(misc.screen, (20, 20, 20), panel_rect)
     pygame.draw.rect(misc.screen, misc.lightColor, panel_rect, 3)
-
     misc.screen.blit(preview, preview_rect)
 
+    # Arrows
     arrow_color = misc.lightColor if self.select == 1 else misc.darkColor
 
     left_arrow = self.itemFont.render("<", True, arrow_color)
@@ -715,19 +752,35 @@ class ChooseTextMenu(Menu):
 
     return _menu_loop(self.refresh, handle_key)
 
-  def refresh(self):
+def refresh(self):
+  misc.screen.blit(self.background, (0, 0))
 
-    y = self.startY
+  # overlay for readability (same as other menus)
+  overlay = pygame.Surface(misc.screen.get_size())
+  overlay.set_alpha(80)
+  overlay.fill((0, 0, 0))
+  misc.screen.blit(overlay, (0, 0))
 
-    # Print the Text (TextInput.render_text appends '_' cursor when not full)
-    text = self.itemFont.render(self._input.render_text(), 1, misc.lightColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
+  center_x = _screen_rect().centerx
 
-    pygame.display.flip()
+  # Title
+  title_text = self.titleFont.render(self.title, True, misc.lightColor)
+  title_rect = title_text.get_rect()
+  title_rect.centerx = center_x
+  title_rect.y = 20
+  misc.screen.blit(title_text, title_rect)
+
+  y = title_rect.bottom + int(40 * misc.zoom)
+
+  # Input text
+  text = self.itemFont.render(self._input.render_text(), True, misc.lightColor)
+  text_rect = text.get_rect()
+  text_rect.centerx = center_x
+  text_rect.y = y
+
+  misc.screen.blit(text, text_rect)
+
+  pygame.display.flip()
 
 
 class ChooseHumanPlayerMenu(Menu):
@@ -866,135 +919,152 @@ class ChooseHumanPlayerMenu(Menu):
 
 
   def refresh(self):
+      misc.screen.blit(self.background, (0, 0))
 
-    y = self.startY
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
 
-    i = 1
+      center_x = _screen_rect().centerx
 
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
 
-    # 1. is Car selection
-    if i == self.select:
-      text = self.itemFont.render("<     >", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("<     >", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    misc.screen.blit(text, textRect)
+      y = title_rect.bottom + int(30 * misc.zoom)
+      i = 1
 
-    # Print the selected Car
-    carRect = self.listCars[self.carColor - 1].get_rect()
-    carRect.centerx = _screen_rect().centerx
-    carRect.y = y + (textRect.height - carRect.height)/2
-    _clear_row(textRect.y, max(textRect.height, carRect.height))
-    misc.screen.blit(text, textRect)
-    misc.screen.blit(self.listCars[self.carColor - 1], carRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
-
-    # 2. is Pseudo selection (TextInput shows '_' cursor when field not full)
-    if i == self.select:
-      text = self.itemFont.render(self._pseudo_input.render_text(), 1, misc.lightColor)
-    else:
-      text = self.itemFont.render(self._pseudo_input.text, 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
-
-    # 3. is Level selection
-    if i == self.select:
-      text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
-
-    # 4. is Key Accel selection
-    if i == self.select:
-      if self.keyAccel == None:
-        text = self.itemFont.render("AccelKey: _", 1, misc.lightColor)
+      # 1. Car selection
+      if i == self.select:
+          text = self.itemFont.render("<     >", True, misc.lightColor)
       else:
-        text = self.itemFont.render("AccelKey: " + pygame.key.name(self.keyAccel), 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("AccelKey: " + pygame.key.name(self.keyAccel), 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+          text = self.itemFont.render("<     >", True, misc.darkColor)
 
-    # 5. is Key Brake selection
-    if i == self.select:
-      if self.keyBrake == None:
-        text = self.itemFont.render("BrakeKey: _", 1, misc.lightColor)
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      car_rect = self.listCars[self.carColor - 1].get_rect()
+      car_rect.centerx = center_x
+      car_rect.y = y + (text_rect.height - car_rect.height) / 2
+      misc.screen.blit(self.listCars[self.carColor - 1], car_rect)
+
+      y = y + max(text_rect.height, car_rect.height) + self.gap
+      i += 1
+
+      # 2. Pseudo selection
+      if i == self.select:
+          text = self.itemFont.render(self._pseudo_input.render_text(), True, misc.lightColor)
       else:
-        text = self.itemFont.render("BrakeKey: " + pygame.key.name(self.keyBrake), 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("BrakeKey: " + pygame.key.name(self.keyBrake), 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
-    # 6. is Key Left selection
-    if i == self.select:
-      if self.keyLeft == None:
-        text = self.itemFont.render("LeftKey: _", 1, misc.lightColor)
+          text = self.itemFont.render(self._pseudo_input.text, True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 3. Level selection
+      if i == self.select:
+          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.lightColor)
       else:
-        text = self.itemFont.render("LeftKey: " + pygame.key.name(self.keyLeft), 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("LeftKey: " + pygame.key.name(self.keyLeft), 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.darkColor)
 
-    # 7. is Key Right selection
-    if i == self.select:
-      if self.keyRight == None:
-        text = self.itemFont.render("RightKey: _", 1, misc.lightColor)
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 4. Key Accel selection
+      if i == self.select:
+          if self.keyAccel is None:
+              text = self.itemFont.render("AccelKey: _", True, misc.lightColor)
+          else:
+              text = self.itemFont.render("AccelKey: " + pygame.key.name(self.keyAccel), True, misc.lightColor)
       else:
-        text = self.itemFont.render("RightKey: " + pygame.key.name(self.keyRight), 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("RightKey: " + pygame.key.name(self.keyRight), 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+          text = self.itemFont.render("AccelKey: " + pygame.key.name(self.keyAccel), True, misc.darkColor)
 
-    # 8. is Go
-    if i == self.select:
-      text = self.itemFont.render("GO", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("GO", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
 
-    pygame.display.flip()
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 5. Key Brake selection
+      if i == self.select:
+          if self.keyBrake is None:
+              text = self.itemFont.render("BrakeKey: _", True, misc.lightColor)
+          else:
+              text = self.itemFont.render("BrakeKey: " + pygame.key.name(self.keyBrake), True, misc.lightColor)
+      else:
+          text = self.itemFont.render("BrakeKey: " + pygame.key.name(self.keyBrake), True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 6. Key Left selection
+      if i == self.select:
+          if self.keyLeft is None:
+              text = self.itemFont.render("LeftKey: _", True, misc.lightColor)
+          else:
+              text = self.itemFont.render("LeftKey: " + pygame.key.name(self.keyLeft), True, misc.lightColor)
+      else:
+          text = self.itemFont.render("LeftKey: " + pygame.key.name(self.keyLeft), True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 7. Key Right selection
+      if i == self.select:
+          if self.keyRight is None:
+              text = self.itemFont.render("RightKey: _", True, misc.lightColor)
+          else:
+              text = self.itemFont.render("RightKey: " + pygame.key.name(self.keyRight), True, misc.lightColor)
+      else:
+          text = self.itemFont.render("RightKey: " + pygame.key.name(self.keyRight), True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 8. Go
+      if i == self.select:
+          text = self.itemFont.render("GO", True, misc.lightColor)
+      else:
+          text = self.itemFont.render("GO", True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      pygame.display.flip()
 
 
 class ChooseRobotPlayerMenu(Menu):
@@ -1089,60 +1159,70 @@ class ChooseRobotPlayerMenu(Menu):
 
 
   def refresh(self):
+      misc.screen.blit(self.background, (0, 0))
 
-    y = self.startY
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
 
-    i = 1
+      center_x = _screen_rect().centerx
 
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
 
-    # 1. is Car selection
-    if i == self.select:
-      text = self.itemFont.render("<     >", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("<     >", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    misc.screen.blit(text, textRect)
+      y = title_rect.bottom + int(30 * misc.zoom)
+      i = 1
 
-    # Print the selected Car
-    carRect = self.listCars[self.carColor - 1].get_rect()
-    carRect.centerx = _screen_rect().centerx
-    carRect.y = y + (textRect.height - carRect.height)/2
-    _clear_row(textRect.y, max(textRect.height, carRect.height))
-    misc.screen.blit(text, textRect)
-    misc.screen.blit(self.listCars[self.carColor - 1], carRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+      # 1. Car selection
+      if i == self.select:
+          text = self.itemFont.render("<     >", True, misc.lightColor)
+      else:
+          text = self.itemFont.render("<     >", True, misc.darkColor)
 
-    # 2. is Level selection
-    if i == self.select:
-      text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("< Level " + str(self.level) + " >", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
 
-    # 3. is Go
-    if i == self.select:
-      text = self.itemFont.render("GO", 1, misc.lightColor)
-    else:
-      text = self.itemFont.render("GO", 1, misc.darkColor)
-    textRect = text.get_rect()
-    textRect.centerx = _screen_rect().centerx
-    textRect.y = y
-    _clear_row(textRect.y, textRect.height)
-    misc.screen.blit(text, textRect)
-    y = y + textRect.height + self.gap
-    i = i + 1
+      car_rect = self.listCars[self.carColor - 1].get_rect()
+      car_rect.centerx = center_x
+      car_rect.y = y + (text_rect.height - car_rect.height) / 2
+      misc.screen.blit(self.listCars[self.carColor - 1], car_rect)
 
-    pygame.display.flip()
+      y = y + max(text_rect.height, car_rect.height) + self.gap
+      i += 1
 
+      # 2. Level selection
+      if i == self.select:
+          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.lightColor)
+      else:
+          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
+
+      # 3. Go
+      if i == self.select:
+          text = self.itemFont.render("GO", True, misc.lightColor)
+      else:
+          text = self.itemFont.render("GO", True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      pygame.display.flip()
 
 # ===========================================================================
 # Network multiplayer menus
@@ -1199,17 +1279,34 @@ class NetworkModeMenu(Menu):
     return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
-    y = self.startY
-    for idx, label in enumerate(["Host a Lobby", "Join a Lobby"], start=1):
-      color = misc.lightColor if idx == self.select else misc.darkColor
-      surf  = self._itemFont.render(label, 1, color)
-      r     = surf.get_rect()
-      r.centerx = _screen_rect().centerx
-      r.y = y
-      _clear_row(r.y, r.height)
-      misc.screen.blit(surf, r)
-      y += r.height + int(20 * misc.zoom)
-    pygame.display.flip()
+      misc.screen.blit(self.background, (0, 0))
+
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
+
+      center_x = _screen_rect().centerx
+
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
+
+      y = title_rect.bottom + int(40 * misc.zoom)
+
+      for idx, label in enumerate(["Host a Lobby", "Join a Lobby"], start=1):
+          color = misc.lightColor if idx == self.select else misc.darkColor
+          surf = self._itemFont.render(label, True, color)
+          r = surf.get_rect()
+          r.centerx = center_x
+          r.y = y
+          misc.screen.blit(surf, r)
+          y += r.height + int(20 * misc.zoom)
+
+      pygame.display.flip()
 
 
 class NetworkIPMenu(Menu):
@@ -1236,20 +1333,39 @@ class NetworkIPMenu(Menu):
     return _menu_loop(self.refresh, handle_key)
 
   def refresh(self):
-    y = self.startY
-    surf = self._itemFont.render(self._input.render_text(), 1, misc.lightColor)
-    r    = surf.get_rect()
-    r.centerx = _screen_rect().centerx
-    r.y = y
-    _clear_row(r.y, r.height)
-    misc.screen.blit(surf, r)
-    y += r.height + int(10 * misc.zoom)
-    hint = misc.popUpFont.render("[ENTER] Connect   [ESC] Back", 1, misc.darkColor)
-    hr   = hint.get_rect()
-    hr.centerx = _screen_rect().centerx
-    hr.y = y
-    misc.screen.blit(hint, hr)
-    pygame.display.flip()
+      misc.screen.blit(self.background, (0, 0))
+
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(80)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
+
+      center_x = _screen_rect().centerx
+
+      # title
+      title_text = self.titleFont.render(self.title, True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = 20
+      misc.screen.blit(title_text, title_rect)
+
+      y = title_rect.bottom + int(40 * misc.zoom)
+
+      surf = self._itemFont.render(self._input.render_text(), True, misc.lightColor)
+      r = surf.get_rect()
+      r.centerx = center_x
+      r.y = y
+      misc.screen.blit(surf, r)
+
+      y += r.height + int(10 * misc.zoom)
+
+      hint = misc.popUpFont.render("[ENTER] Connect   [ESC] Back", True, misc.darkColor)
+      hr = hint.get_rect()
+      hr.centerx = center_x
+      hr.y = y
+      misc.screen.blit(hint, hr)
+
+      pygame.display.flip()
 
 
 class NetworkLobbyMenu(Menu):
