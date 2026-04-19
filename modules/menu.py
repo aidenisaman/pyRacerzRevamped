@@ -721,26 +721,18 @@ class SingleRaceSetupMenu(Menu):
     pygame.display.flip()
     
 class ChooseTextMenu(Menu):
-  '''Menu to choose a Test'''
+  '''Menu to choose a Text'''
 
   def __init__(self, titleFont, title, gap, itemFont, maxLenght):
-
     Menu.__init__(self, titleFont, title)
 
     self.gap = gap
     self.itemFont = itemFont
     self.maxLenght = maxLenght
-    
-    # Display the Title    
-    titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
-
-    self.startY = titleMenu.startY
-
-    # Shared text-input helper handles insert, backspace, and cursor display
     self._input = misc.TextInput(self.maxLenght)
 
   def getInput(self):
-  
+
     def handle_key(key):
       if key == K_ESCAPE:
         return None
@@ -752,36 +744,32 @@ class ChooseTextMenu(Menu):
 
     return _menu_loop(self.refresh, handle_key)
 
-def refresh(self):
-  misc.screen.blit(self.background, (0, 0))
+  def refresh(self):
+    misc.screen.blit(self.background, (0, 0))
 
-  # overlay for readability (same as other menus)
-  overlay = pygame.Surface(misc.screen.get_size())
-  overlay.set_alpha(80)
-  overlay.fill((0, 0, 0))
-  misc.screen.blit(overlay, (0, 0))
+    overlay = pygame.Surface(misc.screen.get_size())
+    overlay.set_alpha(80)
+    overlay.fill((0, 0, 0))
+    misc.screen.blit(overlay, (0, 0))
 
-  center_x = _screen_rect().centerx
+    center_x = _screen_rect().centerx
 
-  # Title
-  title_text = self.titleFont.render(self.title, True, misc.lightColor)
-  title_rect = title_text.get_rect()
-  title_rect.centerx = center_x
-  title_rect.y = 20
-  misc.screen.blit(title_text, title_rect)
+    # title
+    title_text = self.titleFont.render(self.title, True, misc.lightColor)
+    title_rect = title_text.get_rect()
+    title_rect.centerx = center_x
+    title_rect.y = 20
+    misc.screen.blit(title_text, title_rect)
 
-  y = title_rect.bottom + int(40 * misc.zoom)
+    y = title_rect.bottom + int(40 * misc.zoom)
 
-  # Input text
-  text = self.itemFont.render(self._input.render_text(), True, misc.lightColor)
-  text_rect = text.get_rect()
-  text_rect.centerx = center_x
-  text_rect.y = y
+    text = self.itemFont.render(self._input.render_text(), True, misc.lightColor)
+    text_rect = text.get_rect()
+    text_rect.centerx = center_x
+    text_rect.y = y
+    misc.screen.blit(text, text_rect)
 
-  misc.screen.blit(text, text_rect)
-
-  pygame.display.flip()
-
+    pygame.display.flip()
 
 class ChooseHumanPlayerMenu(Menu):
   '''Menu to choose a Human Player'''
