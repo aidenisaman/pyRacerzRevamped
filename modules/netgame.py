@@ -226,8 +226,6 @@ class NetworkHostRace:
 
     clock    = pygame.time.Clock()
     chat_log = []
-    l        = []   # dirty rects
-    i        = 0
     popUp    = misc.PopUp(ct)
     collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
@@ -286,10 +284,6 @@ class NetworkHostRace:
           play.handle_keyup(event.key)
 
       play.update_controls()
-
-      # Clear old position
-      l.append(play.car.rect.__copy__())
-      misc.screen.blit(ct.track, play.car.rect, play.car.rect)
 
       # Physics
       play.car.update()
@@ -386,15 +380,8 @@ class NetworkHostRace:
           "tick": host_tick,
         })
 
-      # Draw car sprites
-      for rp in players_by_pid.values():
-        car = rp.car
-        if car.ox != 0 or car.oy != 0:
-          old_r = pygame.Rect(
-            int(car.ox - car.sizeRect / 2),
-            int(car.oy - car.sizeRect / 2),
-            car.sizeRect, car.sizeRect)
-          misc.screen.blit(ct.track, old_r, old_r)
+      # Full redraw to avoid dirty-rect artifacts with remote interpolation.
+      misc.screen.blit(ct.track, (0, 0))
 
       ct.track.lock()
       for pid, rp in players_by_pid.items():
@@ -407,27 +394,14 @@ class NetworkHostRace:
           car.image = car.cars2[int((256.0 * car.angle / 2.0 / math.pi) % 256)].copy()
 
         _apply_tunnel_mask(ct, car, rp.lastCheckpoint)
-        newRect = car.rect
-        l.append(newRect.__copy__())
         car.sprite.draw(misc.screen)
 
       ct.track.unlock()
 
       # PopUp + chat overlay
       popUp.display()
-      l.append(popUp.rect.__copy__())
       _draw_chat_overlay(chat_log)
-
-      if i == 1:
-        pygame.display.update(l)
-        # Also push the chat region which is not tracked in dirty rects
-        chat_rect = pygame.Rect(0, _chat_y(), misc.screen.get_width(),
-                                misc.screen.get_height() - _chat_y())
-        pygame.display.update(chat_rect)
-        i = 0
-        l = []
-      else:
-        i += 1
+      pygame.display.flip()
 
       # End race when every racer is finished or DNF
       race_done = True
@@ -826,24 +800,24 @@ class NetworkClientRace:
             dist = math.hypot(dx, dy)
             play.car.ox = play.car.x
             play.car.oy = play.car.y
-            if dist > 90:
+            # Keep client feel responsive: only correct substantial divergence.
+            if dist > 160:
               play.car.x = tx
               play.car.y = ty
-            elif dist > 4:
-              play.car.x += dx * 0.28
-              play.car.y += dy * 0.28
+            elif dist > 28:
+              play.car.x += dx * 0.08
+              play.car.y += dy * 0.08
 
             d_ang = (ta - play.car.angle + math.pi) % (2 * math.pi) - math.pi
-            if abs(d_ang) > 1.2:
+            if abs(d_ang) > 2.2:
               play.car.angle = ta
-            else:
-              play.car.angle += d_ang * 0.30
+            elif abs(d_ang) > 0.35:
+              play.car.angle += d_ang * 0.10
 
             play.car.rect.center = (int(play.car.x), int(play.car.y))
-            play.car.brake = msg.get("br", play.car.brake)
-            play.car.slide = msg.get("sl", play.car.slide)
+            # Do not overwrite local transient physics (speed/brake/slide)
+            # with delayed echoed states; that creates a "high friction" feel.
             play.car.blink = msg.get("bl", play.car.blink)
-            play.car.speed = float(msg.get("sp", getattr(play.car, "speed", 0.0)))
 
             play.lastCheckpoint = msg.get("cp", play.lastCheckpoint)
             play.nbLap = msg.get("lap", play.nbLap)
@@ -897,18 +871,9 @@ class NetworkClientRace:
         rp.nbLap = tgt.get("lap", rp.nbLap)
         rp.raceFinish = tgt.get("rf", rp.raceFinish)
 
-      # Erase previous car locations
+      # Draw cars on a full redraw to eliminate lingering artifacts.
       all_players = [play] + list(remote_cars.values())
-      for rp in all_players:
-        car = rp.car
-        if car.ox != 0 or car.oy != 0:
-          old_r = pygame.Rect(
-            int(car.ox - car.sizeRect / 2),
-            int(car.oy - car.sizeRect / 2),
-            car.sizeRect, car.sizeRect)
-          misc.screen.blit(ct.track, old_r, old_r)
-
-      # Draw cars
+      misc.screen.blit(ct.track, (0, 0))
       ct.track.lock()
       for rp in all_players:
         car = rp.car
