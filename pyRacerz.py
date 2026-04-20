@@ -126,6 +126,13 @@ def main():
     print(e)
     sys.exit(-1)
 
+  try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if base_dir:
+      os.chdir(base_dir)
+  except Exception:
+    pass
+
   if pygame.display.mode_ok((int(1024*misc.zoom), int(768*misc.zoom)), displayFlags, 24) == 0:
      print("pyRacerz cannot initialize display...")
      sys.exit(-1)
@@ -135,9 +142,9 @@ def main():
   pygame.display.set_caption("pyRacerz v" + misc.VERSION)
   pygame.display.set_icon(pygame.image.load(os.path.join("sprites", "pyRacerzIcon.bmp")))
 
-  if misc.music == 1:
-    pygame.mixer.music.load(os.path.join("sounds", "start.ogg"))
-    pygame.mixer.music.play()
+  pygame.mixer.music.load(os.path.join("musics", "menu_music.wav"))
+  pygame.mixer.music.set_volume(0.5)
+  pygame.mixer.music.play(-1)
 
   #figure out what psyco was
   try:
@@ -147,66 +154,76 @@ def main():
     print ("Cannot use psyCo...")
     pass
   
-  pygame.mouse.set_visible(0)
+  # pygame.mouse.set_visible(1)
+  pygame.mouse.set_visible(1)
 
   misc.init()
 
   select1 = 1
 
   while select1 != -1:
-    menu1 = menu.SimpleMenu(misc.titleFont, "pyRacerz v" + misc.VERSION, 20*misc.zoom, misc.itemFont, ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License", "Multiplayer"])
-    select1 = menu1.getInput()
+    menu1 = menu.SimpleMenu(
+        misc.titleFont,
+        "pyRacerz v" + misc.VERSION,
+        20 * misc.zoom,
+        misc.itemFont,
+        ["Single Race", "Tournament", "Challenge", "Replays", "Hi Scores", "Credits", "License", "Multiplayer"],
+        misc.main_menu_background
+    )
 
+    pygame.event.clear()
+    select1 = menu1.getInput()
     # Single Race
     if select1 == 1:
       race = game.Game("singleRace")
 
-      menu2 = menu.ChooseTrackMenu(misc.titleFont, "singleRace: chooseTrack", 2*misc.zoom, misc.itemFont)
-      select2 = menu2.getInput()
-      if select2 != -1:
-        race.listTrackName = [[select2[0], select2[1]] ]
+      setup_menu = menu.SingleRaceSetupMenu(
+          misc.titleFont,
+          "singleRace: setup",
+          5 * misc.zoom,
+          misc.itemFont
+      )
+      setup = setup_menu.getInput()
 
-        menu3 = menu.ChooseValueMenu(misc.titleFont, "singleRace: chooseNbLaps", 0, misc.itemFont, 1, 10)
-        select3 = menu3.getInput()
-        if select3 != -1:
-          race.maxLapNb = select3
+      if setup != -1:
+        race.listTrackName = [[setup["track"], setup["reverse"]]]
+        race.maxLapNb = setup["laps"]
 
-          menu4 = menu.ChooseValueMenu(misc.titleFont, "singleRace: chooseNbHumanPlayers", 0, misc.itemFont, 0, 4)
-          select4 = menu4.getInput()
-          if select4 != -1:
+        select4 = setup["humans"]
+        select6 = setup["bots"]
 
-            isExit = 0
-            race.listPlayer = []
-            for i in range(1, select4+1):
-              menu5 = menu.ChooseHumanPlayerMenu(misc.titleFont, "singleRace: chooseHumanPlayer" + str(i), 5*misc.zoom, misc.itemFont)
-              thePlayer = menu5.getInput()
-              if thePlayer == -1:
-                isExit = 1
-                break
-              race.listPlayer.append(thePlayer)
+        isExit = 0
+        race.listPlayer = []
 
-            # If there's no exit during enter of player
-            if isExit == 0:
-              # If there's no Human player, there should exist at least a Bot player
-              if select4 == 0:
-                minBot = 1
-              else:
-                minBot = 0
-              menu6 = menu.ChooseValueMenu(misc.titleFont, "singleRace: chooseNbRobotPlayers", 0, misc.itemFont, minBot, 4)
-              select6 = menu6.getInput()
-              if select6 != -1:
-                isExit = 0
-                for i in range(1, select6+1):
-                  menu7 = menu.ChooseRobotPlayerMenu(misc.titleFont, "singleRace: chooseRobotPlayer" + str(i), 5*misc.zoom, misc.itemFont)
-                  thePlayer = menu7.getInput()
-                  if thePlayer == -1:
-                    isExit = 1
-                    break
-                  race.listPlayer.append(thePlayer)
- 
-                # If there's no exit during enter of player
-                if isExit == 0:
-                  race.play()
+        for i in range(1, select4 + 1):
+          menu5 = menu.ChooseHumanPlayerMenu(
+              misc.titleFont,
+              "singleRace: chooseHumanPlayer" + str(i),
+              5 * misc.zoom,
+              misc.itemFont
+          )
+          thePlayer = menu5.getInput()
+          if thePlayer == -1:
+            isExit = 1
+            break
+          race.listPlayer.append(thePlayer)
+
+        if isExit == 0:
+          for i in range(1, select6 + 1):
+            menu7 = menu.ChooseRobotPlayerMenu(
+                misc.titleFont,
+                "singleRace: chooseRobotPlayer" + str(i),
+                5 * misc.zoom,
+                misc.itemFont
+            )
+            thePlayer = menu7.getInput()
+            if thePlayer == -1:
+              isExit = 1
+              break
+            race.listPlayer.append(thePlayer)
+
+          if isExit == 0:
+            race.play()
 
     # Tournament
     elif select1 == 2:

@@ -28,10 +28,14 @@ import configparser
 
 VERSION = "0.2"
 
-lightColor = (230, 230, 255)
-darkColor = (118, 118, 151)
+# Bright white (for selected text)
+lightColor = (255, 255, 255)
+
+# Strong gray (for unselected text)
+darkColor = (180, 180, 180)
 
 background = None
+main_menu_background = None
 screen = None
 
 popUpFont = None
@@ -43,6 +47,12 @@ bigFont = None
 music = 1
 
 zoom = 1
+USE_SYS_FONT = True
+FONT_NAME = "verdana"
+USE_BG_IMAGE = True
+BACKGROUND_FILE = os.path.join("credits", "regular_menu_bg.png")
+main_menu_bg_file = os.path.join("credits", "pyracerz menu.png")
+BACKGROUND_COLOR = (0, 0, 0)
 
 def init():
   global popUpFont
@@ -52,18 +62,94 @@ def init():
   global bigFont
   global background
 
-  try:
-    popUpFont = pygame.font.Font(os.path.join("fonts", "arcade_pizzadude", "ARCADE.TTF"), int(24*zoom))
-    titleFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(52*zoom))
-    itemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(34*zoom))
-    smallItemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(30*zoom))
-    bigFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(66*zoom))
-  except Exception as e:
-    print("Cannot initialize fonts:")
-    print(e)
-    sys.exit(-1)
+  # Prefer system font if requested (useful for quick changes)
+  if USE_SYS_FONT:
+    popUpFont = pygame.font.SysFont(FONT_NAME, int(24*zoom))
+    titleFont = pygame.font.SysFont(FONT_NAME, int(52*zoom))
+    itemFont = pygame.font.SysFont(FONT_NAME, int(34*zoom))
+    smallItemFont = pygame.font.SysFont(FONT_NAME, int(30*zoom))
+    bigFont = pygame.font.SysFont(FONT_NAME, int(66*zoom))
+  else:
+    try:
+      popUpFont = pygame.font.Font(os.path.join("fonts", "arcade_pizzadude", "ARCADE.TTF"), int(24*zoom))
+      titleFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(52*zoom))
+      itemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(34*zoom))
+      smallItemFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(30*zoom))
+      bigFont = pygame.font.Font(os.path.join("fonts", "alba", "ALBA____.TTF"), int(66*zoom))
+    except Exception as e:
+      print("Cannot initialize bundled TTF fonts, falling back to system fonts:")
+      print(e)
+      popUpFont = pygame.font.SysFont(FONT_NAME, int(24*zoom))
+      titleFont = pygame.font.SysFont(FONT_NAME, int(52*zoom))
+      itemFont = pygame.font.SysFont(FONT_NAME, int(34*zoom))
+      smallItemFont = pygame.font.SysFont(FONT_NAME, int(30*zoom))
+      bigFont = pygame.font.SysFont(FONT_NAME, int(66*zoom))
 
-  background = pygame.transform.scale(pygame.image.load(os.path.join("sprites", "background.png")).convert(), (int(1024*zoom), int(768*zoom)))
+  # Configure background: use image only if enabled, otherwise solid color
+  # Configure background: use image only if enabled, otherwise solid color
+  target_w = int(1024 * zoom)
+  target_h = int(768 * zoom)
+  if USE_BG_IMAGE:
+    try:
+      img = pygame.image.load(BACKGROUND_FILE)
+      # Prefer convert_alpha if the image has transparency, fall back to convert
+      try:
+        img = img.convert_alpha()
+      except Exception:
+        img = img.convert()
+
+      iw, ih = img.get_size()
+      # Stretch the image to fill the entire screen
+      new_w = target_w
+      new_h = target_h
+
+      # Use smoothscale when available for better quality
+      try:
+        img = pygame.transform.smoothscale(img, (new_w, new_h))
+      except Exception:
+        img = pygame.transform.scale(img, (new_w, new_h))
+
+      # No offset needed since we're stretching to full size
+      offset_x = 0
+      offset_y = 0
+      background = pygame.Surface((target_w, target_h)).convert()
+      background.blit(img, (offset_x, offset_y))
+    except Exception as e:
+      print("Warning: unable to load background image, using solid color background:")
+      print(e)
+      background = pygame.Surface((target_w, target_h))
+      background.fill(BACKGROUND_COLOR)
+  else:
+    background = pygame.Surface((target_w, target_h))
+    background.fill(BACKGROUND_COLOR)
+
+  # Load main menu background
+  global main_menu_background
+  main_menu_bg_file = os.path.join("credits", "pyracerz menu.png")
+  try:
+    img = pygame.image.load(main_menu_bg_file)
+    try:
+      img = img.convert_alpha()
+    except Exception:
+      img = img.convert()
+
+    iw, ih = img.get_size()
+    new_w = target_w
+    new_h = target_h
+
+    try:
+      img = pygame.transform.smoothscale(img, (new_w, new_h))
+    except Exception:
+      img = pygame.transform.scale(img, (new_w, new_h))
+
+    offset_x = 0
+    offset_y = 0
+    main_menu_background = pygame.Surface((target_w, target_h)).convert()
+    main_menu_background.blit(img, (offset_x, offset_y))
+  except Exception as e:
+    print("Warning: unable to load main menu background image, using default background:")
+    print(e)
+    main_menu_background = background
 
   # Enable key repeat so held backspace/letters repeat in text-entry menus
   # (400 ms initial delay, 50 ms repeat interval)
@@ -183,7 +269,7 @@ def addHiScore(track, player):
   if not confFile.has_option("hi " + track.name, "level" + str(level)):
     h = sha1()
     h.update(str(track.name).encode())
-    h.update(str("level" + str(level)).encode())
+    h.update(("level" + str(level)).encode())
     h.update(player.name.encode())
     h.update(str(player.bestChrono).encode())
     fwrite = open(".pyRacerz.conf", "w+")
@@ -194,14 +280,14 @@ def addHiScore(track, player):
     hi = confFile.get("hi " + track.name, "level" + str(level)).split()
     h = sha1()
     h.update(str(track.name).encode())
-    h.update(str("level" + str(level)).encode())
+    h.update(("level" + str(level)).encode())
     h.update(hi[0].encode())
     h.update(hi[1].encode())
     if hi[2] == h.hexdigest():
       if int(hi[1]) > player.bestChrono:
         h = sha1()
         h.update(str(track.name).encode())
-        h.update(str("level" + str(level)).encode())
+        h.update(("level" + str(level)).encode())
         h.update(player.name.encode())
         h.update(str(player.bestChrono).encode())
         fwrite = open(".pyRacerz.conf", "w+")
@@ -214,14 +300,14 @@ def addHiScore(track, player):
       # If the HiScore is Corrupted, erase it
       h = sha1()
       h.update(str(track.name).encode())
-      h.update(str("level" + str(level)).encode())
+      h.update(("level" + str(level)).encode())
       h.update(player.name.encode())
       h.update(str(player.bestChrono).encode())
       fwrite = open(".pyRacerz.conf", "w+")
       confFile.set("hi " + track.name, "level" + str(level), player.name + " " + str(player.bestChrono) + " " + h.hexdigest())
       confFile.write(fwrite)
       return 1
-
+    
 def getUnlockLevel():
 
   confFile=configparser.ConfigParser() 
@@ -238,6 +324,7 @@ def getUnlockLevel():
   key = confFile.get("unlockLevel", "key").split()
   h = sha1()
   h.update(str("pyRacerz").encode())
+
   h.update(str(key[0]).encode())
   if h.hexdigest() == key[1]:
     return key[0]
@@ -332,8 +419,8 @@ def setUnlockLevel(lck):
     confFile.write(fwrite)
     confFile.read_file(open(".pyRacerz.conf", "r"))
 
-  h = sha1()
-  h.update(str("pyRacerz").encode())
+  h = sha1("pyRacerz".encode())
+
   h.update(str(lck).encode())
   fwrite = open(".pyRacerz.conf", "w+")
   confFile.set("unlockLevel", "key", str(lck) + " " + h.hexdigest())
