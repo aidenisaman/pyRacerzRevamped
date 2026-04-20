@@ -268,7 +268,6 @@ class Game:
         for play in self.listPlayer:
           play.car.sprite.draw(misc.screen)
 
-        #Ensure display is updated only once per frame
         pygame.display.flip()  
 
         # Get the event keys
@@ -517,9 +516,11 @@ class Game:
             play.raceFinish = 1
             play.car.blink = 1
 
+
           # Test is somebody has not finished
           if play.nbLap < self.maxLapNb:
             raceFinish = 0
+
 
           # Blink = 0, no blink
           if play.car.blink == 0:
