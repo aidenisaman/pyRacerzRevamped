@@ -67,6 +67,7 @@ class Game:
       # If it's the first time do Randomly
       if currentTrackName == self.listTrackName[0]:
         listRank = []
+
         for play in self.listPlayer:
           rank = -1
           while rank in listRank or rank == -1:
@@ -419,8 +420,8 @@ class Game:
         popUp.display()
         l.append(popUp.rect.__copy__())
 
-        titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "raceResult")
-        y = titleMenu.startY
+        # Assume race is complete; any unfinished player below will clear it.
+        raceFinish = 1
 
         for play in self.listPlayer:
 
@@ -477,12 +478,12 @@ class Game:
 
 
           # Test if the player has finished
-          if play.nbLap == self.maxLapNb and play.raceFinish != 1:
+          if play.nbLap >= self.maxLapNb and play.raceFinish != 1:
             play.raceFinish = 1
             play.car.blink = 1
 
           # Test is somebody has not finished
-          if play.nbLap != self.maxLapNb:
+          if play.nbLap < self.maxLapNb:
             raceFinish = 0
 
           # Blink = 0, no blink
@@ -701,6 +702,9 @@ class Game:
 
       playCar = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "cars", "car" + str(play.car.color) + ".png")).convert_alpha(), 270, 1.2*misc.zoom)
 
+      # Default text for non-tournament modes
+      text = None
+
       # If it's a tournament, compute points
       if self.gameType == "tournament":
         if bestChrono == 1:
@@ -709,46 +713,13 @@ class Game:
           else:
             text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " + 2 = " + str(play.point+morePoint+2) + "  >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
           play.point = play.point + morePoint + 2
-
-        titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "finalResult")
-        y = titleMenu.startY
-
-        for play in self.listPlayer:
-            self.rank = 1
-            for play2 in self.listPlayer:
-                if play.point < play2.point:
-                    self.rank += 1
-
-            playCar = pygame.transform.rotozoom(
-                pygame.image.load(os.path.join("sprites", "cars",
-                                               "car" + str(play.car.color) + ".png")).convert_alpha(),
-                270, 1.2*misc.zoom)
-
-            if self.rank == 1:
-                text = misc.titleFont.render(
-                    str(play.rank) + "' " + play.name + " :  >> " + str(play.point) + " <<",
-                    1, misc.lightColor)
-            else:
-                text = misc.titleFont.render(
-                    str(play.rank) + "' " + play.name + " : " + str(play.point),
-                    1, misc.darkColor)
-
-            playCarRect = playCar.get_rect()
-            textRect    = text.get_rect()
-            textRect.centerx    = misc.screen.get_rect().centerx + (playCarRect.width + 20*misc.zoom) / 2
-            textRect.y          = y + 80*misc.zoom*play.rank
-            playCarRect.x       = textRect.x - (playCarRect.width + 20*misc.zoom)
-            playCarRect.centery = textRect.centery
-            misc.screen.blit(playCar, playCarRect)
-            misc.screen.blit(text, textRect)
-
+      
+      # For single-race modes (non-tournament), display rank and chrono
+      if text is None:
         if bestChrono == 1:
-          if misc.addHiScore(track, play) == 1:
-            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
-          else:
-            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
+          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
         else:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :    " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
+          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
 
       # Display the car with statistics
       playCarRect = playCar.get_rect()
