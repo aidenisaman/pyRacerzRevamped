@@ -207,7 +207,6 @@ class Game:
         for play in self.listPlayer:
           play.car.sprite.draw(misc.screen)
 
-        #Ensure display is updated only once per frame
         pygame.display.flip()  
 
         # Get the event keys
