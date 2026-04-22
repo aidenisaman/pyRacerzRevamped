@@ -134,48 +134,63 @@ def _advance_progress(play, ct, popUp=None, place=None):
         play.chrono = 0
 
 
-def _resolve_simple_collision(play_a, play_b, track_name):
-  """Cheap host-side collision response for network PvP.
+def _same_collision_layer(track_name, cp_a, cp_b):
+  if track_name.startswith("desert"):
+    return (cp_a == 80) == (cp_b == 80)
+  if track_name.startswith("city"):
+    return (cp_a == 48) == (cp_b == 48)
+  return True
 
-  This avoids full deterministic replay/rollback while still making contact
-  visible and authoritative from the host.
-  """
-  if _is_upper_layer(track_name, play_a.lastCheckpoint) != _is_upper_layer(track_name, play_b.lastCheckpoint):
-    return
 
-  ra = play_a.car.rect
-  rb = play_b.car.rect
-  if not ra.colliderect(rb):
-    return
+def _apply_singleplayer_collision(play, play2):
+  """Mirror the directional collision response used by single-player mode."""
+  playCollisionRects = []
+  play2CollisionRects = []
 
-  ov = ra.clip(rb)
-  if ov.width <= 0 or ov.height <= 0:
-    return
+  listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(0)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  if ov.width < ov.height:
-    push = ov.width / 2.0 + 1.0
-    if play_a.car.x <= play_b.car.x:
-      play_a.car.x -= push
-      play_b.car.x += push
-    else:
-      play_a.car.x += push
-      play_b.car.x -= push
-  else:
-    push = ov.height / 2.0 + 1.0
-    if play_a.car.y <= play_b.car.y:
-      play_a.car.y -= push
-      play_b.car.y += push
-    else:
-      play_a.car.y += push
-      play_b.car.y -= push
+  listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(1)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  sa = float(getattr(play_a.car, "speed", 0.0))
-  sb = float(getattr(play_b.car, "speed", 0.0))
-  play_a.car.speed = -0.30 * sa + 0.20 * sb
-  play_b.car.speed = -0.30 * sb + 0.20 * sa
+  listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(2)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  play_a.car.rect.center = (int(play_a.car.x), int(play_a.car.y))
-  play_b.car.rect.center = (int(play_b.car.x), int(play_b.car.y))
+  listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(3)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
+
+  playCollisionRects.sort()
+
+  if playCollisionRects == [0]:
+    play.car.newSpeed = play.car.speed / 2 - abs(play2.car.speed / 2)
+  elif playCollisionRects == [1]:
+    play.car.newSpeed = play.car.speed / 2 + abs(play2.car.speed / 2)
+  elif playCollisionRects == [2] or playCollisionRects == [0, 1, 2] or playCollisionRects == [0, 2] or playCollisionRects == [1, 2]:
+    play.car.speedL = play.car.speedL + abs(play2.car.speed / 2) * 10
+    play.car.newSpeed = 0
+  elif playCollisionRects == [3] or playCollisionRects == [0, 1, 3] or playCollisionRects == [0, 3] or playCollisionRects == [1, 3]:
+    play.car.speedL = play.car.speedL - abs(play2.car.speed / 2) * 10
+    play.car.newSpeed = 0
+  elif playCollisionRects != []:
+    play.car.newSpeed = 0
+
+  return playCollisionRects != []
 
 
 # ===========================================================================
@@ -267,21 +282,28 @@ class NetworkHostRace:
 
     # ── main race loop ───────────────────────────────────────────────
     running = True
+    aborted = False
     while running:
 
       # Events
       for event in pygame.event.get():
         if event.type == QUIT:
           self.server.broadcast({"type": "finish", "standings": []})
-          misc.stopMusic()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
         elif event.type == KEYDOWN:
           if event.key == K_ESCAPE:
             self.server.broadcast({"type": "finish", "standings": []})
-            return
+            aborted = True
+            running = False
+            break
           play.handle_keydown(event.key)
         elif event.type == KEYUP:
           play.handle_keyup(event.key)
+
+      if not running:
+        break
 
       play.update_controls()
 
@@ -357,7 +379,15 @@ class NetworkHostRace:
 
       collision_grid.rebuild(active_players, get_rect=lambda p: p.car.rect)
       for pa, pb in collision_grid.candidate_pairs():
-        _resolve_simple_collision(pa, pb, ct.name)
+        if not _same_collision_layer(ct.name, pa.lastCheckpoint, pb.lastCheckpoint):
+          continue
+        _apply_singleplayer_collision(pa, pb)
+        _apply_singleplayer_collision(pb, pa)
+
+      for rp in active_players:
+        if rp.car.newSpeed != 0:
+          rp.car.speed = rp.car.newSpeed
+          rp.car.newSpeed = 0
 
       # Broadcast authoritative state for every non-DNF racer
       host_tick += 1
@@ -415,6 +445,9 @@ class NetworkHostRace:
         running = False
 
       clock.tick(100)
+
+    if aborted:
+      return
 
     # Race finished
     standings = []
@@ -518,6 +551,7 @@ class NetworkWatchRace:
     pygame.display.flip()
 
     running = True
+    aborted = False
 
     while running:
 
@@ -529,8 +563,9 @@ class NetworkWatchRace:
             "name": self.spectator_name,
             "pid":  getattr(self.client, "player_id", -1),
           })
-          self.client.disconnect()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
         elif event.type == KEYDOWN:
           if is_typing:
             if event.key == K_RETURN:
@@ -553,9 +588,13 @@ class NetworkWatchRace:
                 "name": self.spectator_name,
                 "pid":  getattr(self.client, "player_id", -1),
               })
+              aborted = True
               running = False
             elif event.key == K_t:
               is_typing = True
+
+      if not running:
+        break
 
       # Network messages
       for msg in self.client.recv_all():
@@ -632,6 +671,10 @@ class NetworkWatchRace:
 
       pygame.display.flip()
       clock.tick(60)
+
+    if aborted:
+      self.client.disconnect()
+      return
 
     # Race over banner
     misc.screen.blit(ct.track, (0, 0))
@@ -711,6 +754,7 @@ class NetworkClientRace:
     is_typing  = False
     tick       = 0
     running    = True
+    aborted    = False
     finish_msg = None
 
     misc.screen.blit(ct.track, (0, 0))
@@ -724,8 +768,9 @@ class NetworkClientRace:
       for event in pygame.event.get():
         if event.type == QUIT:
           self.client.send({"type": "bye", "name": play.name, "pid": my_pid})
-          self.client.disconnect()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
 
         elif event.type == KEYDOWN:
           if is_typing:
@@ -743,6 +788,7 @@ class NetworkClientRace:
           else:
             if event.key == K_ESCAPE:
               self.client.send({"type": "bye", "name": play.name, "pid": my_pid})
+              aborted = True
               running = False
             elif event.key == K_t:
               is_typing = True
@@ -891,6 +937,10 @@ class NetworkClientRace:
 
       pygame.display.flip()
       clock.tick(100)
+
+    if aborted:
+      self.client.disconnect()
+      return
 
     # End-of-race banner + compact standings if provided by host
     misc.screen.blit(ct.track, (0, 0))
