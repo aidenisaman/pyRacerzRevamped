@@ -449,7 +449,7 @@ def main():
                   break
 
             #misc.startRandomMusic()
-            netgame.NetworkClientRace(
+            race_result = netgame.NetworkClientRace(
               cli,
               joinPlayer,
               track_name=result["track"],
@@ -458,6 +458,8 @@ def main():
               laps=result["laps"],
             ).run()
             misc.stopMusic()
+            if race_result == "leave":
+              break
             # Loop back to lobby for another race
 
 #import profile

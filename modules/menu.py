@@ -1461,7 +1461,7 @@ class NetworkLobbyMenu(Menu):
       return "refresh"
     if key == K_ESCAPE:
       if self._is_host:
-        self._net.broadcast({"type": "finish"})
+        self._net.broadcast({"type": "lobby_close"})
         self._net.stop()
         return {"action": "close"}
       else:
@@ -1620,10 +1620,15 @@ class NetworkLobbyMenu(Menu):
           "roster":     msg.get("roster", []),
         }
 
-      elif mtype == "finish" and not self._is_host:
-        # Host closed the lobby — leave gracefully
+      elif mtype == "lobby_close" and not self._is_host:
+        # Host closed the lobby - leave gracefully.
         self._net.disconnect()
         result = {"action": "leave"}
+
+      elif mtype == "finish" and not self._is_host:
+        # Race-finish packet can still be in socket buffers when returning
+        # to lobby; ignore it here so client may stay for the next race.
+        changed = True
 
     if result:
       return result
