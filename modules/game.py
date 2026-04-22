@@ -36,6 +36,8 @@ import datetime
 
 class Game:
   '''Class representing a game: Tournament or Single Race'''
+  # Class-level cache for checkpoint overlays per track name
+  checkpoint_overlay_cache = {}
 
   def __init__(self, gameType, listTrackName=None, listPlayer=None, maxLapNb=-1):
     '''Constructor'''
@@ -60,22 +62,27 @@ class Game:
         print(e)
         sys.exit(1)
 
-      #Precompute yellow overlays for each checkpoint 
-      checkpoint_overlays = {}
-      if hasattr(currentTrack, 'trackF'):
-        width, height = currentTrack.trackF.get_size()
-        if hasattr(currentTrack, 'nbCheckpoint'):
-          for checkpoint_value in range(16, 16 * (getattr(currentTrack, 'nbCheckpoint', 0) + 1), 16):
-            mask = pygame.Surface((width, height), pygame.SRCALPHA)
-            #Fully Transparent as default
-            mask.fill((0, 0, 0, 0))  
-            for x in range(width):
-              for y in range(height):
-                r, g, b, *_ = currentTrack.trackF.get_at((x, y))
-                if r == checkpoint_value:
-                  #Semi Transparent yellow
-                  mask.set_at((x, y), (255, 255, 0, 120))  
-            checkpoint_overlays[checkpoint_value] = mask
+      # Use a cache key based on track name and reverse
+      cache_key = (getattr(currentTrack, 'name', str(currentTrackName)), getattr(currentTrack, 'reverse', 0))
+      if cache_key in Game.checkpoint_overlay_cache:
+        checkpoint_overlays = Game.checkpoint_overlay_cache[cache_key]
+      else:
+        checkpoint_overlays = {}
+        if hasattr(currentTrack, 'trackF'):
+          width, height = currentTrack.trackF.get_size()
+          if hasattr(currentTrack, 'nbCheckpoint'):
+            for checkpoint_value in range(16, 16 * (getattr(currentTrack, 'nbCheckpoint', 0) + 1), 16):
+              mask = pygame.Surface((width, height), pygame.SRCALPHA)
+              # Fully Transparent as default
+              mask.fill((0, 0, 0, 0))  
+              for x in range(width):
+                for y in range(height):
+                  r, g, b, *_ = currentTrack.trackF.get_at((x, y))
+                  if r == checkpoint_value:
+                    # Semi Transparent yellow
+                    mask.set_at((x, y), (255, 255, 0, 120))  
+              checkpoint_overlays[checkpoint_value] = mask
+        Game.checkpoint_overlay_cache[cache_key] = checkpoint_overlays
 
       # Play music
       #misc.startRandomMusic()
