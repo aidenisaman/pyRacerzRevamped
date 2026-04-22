@@ -62,7 +62,7 @@ class Game:
         print(e)
         sys.exit(1)
 
-      # Use a cache key based on track name and reverse
+      # Use a cache key based on track name
       cache_key = (getattr(currentTrack, 'name', str(currentTrackName)), getattr(currentTrack, 'reverse', 0))
       if cache_key in Game.checkpoint_overlay_cache:
         checkpoint_overlays = Game.checkpoint_overlay_cache[cache_key]
