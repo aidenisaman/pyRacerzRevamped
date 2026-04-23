@@ -302,8 +302,8 @@ class Game:
         try:
             _snd_collision = pygame.mixer.Sound(os.path.join("sounds", "collision.mp3"))
             _snd_drift     = pygame.mixer.Sound(os.path.join("sounds", "drift.mp3"))
-            _snd_collision.set_volume(0.6)
-            _snd_drift.set_volume(0.5)
+            _snd_collision.set_volume(0.05)
+            _snd_drift.set_volume(0.05)
         except Exception:
             _snd_collision = None
             _snd_drift     = None
