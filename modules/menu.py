@@ -1444,10 +1444,15 @@ class NetworkLobbyMenu(Menu):
         self._net.stop()
         return {"action": "close"}
       else:
-        self._net.send({"type": "bye"})
+        self._net.send({
+          "type": "bye",
+          "name": self._local_name,
+          "pid":  getattr(self._net, "player_id", -1),
+        })
         self._net.disconnect()
         return {"action": "leave"}
     if key == K_s and self._is_host:
+      roster = self._net.get_player_list()
       # Start race: broadcast start message then return
       self._net.broadcast({
         "type":       "start",
@@ -1457,9 +1462,9 @@ class NetworkLobbyMenu(Menu):
         "host_name":  self._local_name,
         "host_color": self._host_color,
         "host_level": self._host_level,
-        "roster":     self._net.get_player_list(),
+        "roster":     roster,
       })
-      return {"action": "start"}
+      return {"action": "start", "roster": roster}
     return None
 
   # ------------------------------------------------------------------
@@ -1476,7 +1481,8 @@ class NetworkLobbyMenu(Menu):
         color  = msg.get("color", 1)
         level  = msg.get("level", 1)
         cidx   = msg.get("_client_idx", 0)
-        self._net.register_player(cidx, name, color, level)
+        pid = self._net.register_player(cidx, name, color, level)
+        self._net.send_to(cidx, {"type": "assigned", "pid": pid})
         if name not in self._players:
           self._players.append(name)
         self._chat_log.append("*** " + name + " joined ***")
@@ -1485,6 +1491,12 @@ class NetworkLobbyMenu(Menu):
           "list":   self._players,
           "roster": self._net.get_player_list(),
         })
+        changed = True
+
+      elif mtype == "assigned" and not self._is_host:
+        pid = msg.get("pid", -1)
+        self._net.player_id = pid
+        self._chat_log.append("*** assigned racer id P" + str(pid) + " ***")
         changed = True
 
       elif mtype == "players" and not self._is_host:
@@ -1501,9 +1513,13 @@ class NetworkLobbyMenu(Menu):
         changed = True
 
       elif mtype == "bye" and self._is_host:
-        name = msg.get("name", "?")
+        cidx = msg.get("_client_idx", -1)
+        reg  = self._net.get_player(cidx) if cidx >= 0 else None
+        name = msg.get("name", reg["name"] if reg else "?")
         self._players = [p for p in self._players if p != name]
         self._chat_log.append("*** " + name + " left ***")
+        if cidx >= 0:
+          self._net.remove_player(cidx)
         self._net.broadcast({
           "type":   "players",
           "list":   self._players,
