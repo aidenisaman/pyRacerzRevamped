@@ -142,9 +142,7 @@ def main():
   pygame.display.set_caption("pyRacerz v" + misc.VERSION)
   pygame.display.set_icon(pygame.image.load(os.path.join("sprites", "pyRacerzIcon.bmp")))
 
-  pygame.mixer.music.load(os.path.join("musics", "menu_music.wav"))
-  pygame.mixer.music.set_volume(0.5)
-  pygame.mixer.music.play(-1)
+  misc.startMenuMusic()
 
   #figure out what psyco was
   try:
@@ -223,6 +221,14 @@ def main():
             race.listPlayer.append(thePlayer)
 
           if isExit == 0:
+            print("DEBUG track:", race.listTrackName)
+            print("DEBUG laps:", race.maxLapNb)
+            print("DEBUG players:", len(race.listPlayer))
+            for p in race.listPlayer:
+              print("DEBUG player:", getattr(p, "name", "unknown"), type(p).__name__)
+
+            print("DEBUG chosen track:", race.listTrackName[0][0])
+            misc.startRaceMusic(race.listTrackName[0][0])
             race.play()
 
     # Tournament
