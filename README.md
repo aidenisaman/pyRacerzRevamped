@@ -1,7 +1,5 @@
 # pyRacerzRevamped
 
-## Cycle One Version Description
-
 ### Full feature set delivered on main
 
 #### 1. Gameplay architecture and technical cleanup
