@@ -13,6 +13,7 @@
 - Make a Windows .exe
 -Make care sprites bigger
 
--Fix client collsion so that it is handled the same as it is in singleplayer
--Fix the esc button so that it actually goes back
--Make so that once a race is finished the host can select a new track and the client has the choice to stay in lobby or leave
+-Fix client collsion so that it is handled the same as it is in singleplayer(closer but still getting stuck if colliding with a building or off track terrain)
+-Fix the esc button so that it actually goes back(still does not work)
+-Make so that once a race is finished the host can select a new track and the client has the choice to stay in lobby or leave(not working)
+-client can start the race sooner than the host as there is no start lights

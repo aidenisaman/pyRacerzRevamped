@@ -352,16 +352,20 @@ def main():
         srv = network.NetworkServer()
         srv.start()
 
+        selected_track_name = trackInfo[0]
+        selected_track_rev = trackInfo[1]
+        selected_laps = laps
+
         # Lobby → Race loop (keeps cycling until host closes lobby)
         while True:
           lobby = menu.NetworkLobbyMenu(
             srv, is_host=True,
             local_name=hostName,
-            track_name=trackInfo[0],
-            track_rev=trackInfo[1],
+            track_name=selected_track_name,
+            track_rev=selected_track_rev,
             host_color=thePlayer.car.color,
             host_level=thePlayer.car.level,
-            laps=laps,
+            laps=selected_laps,
           )
           result = lobby.getInput()
 
@@ -369,13 +373,16 @@ def main():
             break   # srv already stopped inside lobby
 
           elif result["action"] == "start":
-            currentTrack = track.Track(trackInfo[0], trackInfo[1])
+            selected_track_name = result.get("track", selected_track_name)
+            selected_track_rev = result.get("reverse", selected_track_rev)
+            selected_laps = result.get("laps", selected_laps)
+            currentTrack = track.Track(selected_track_name, selected_track_rev)
             #misc.startRandomMusic()
             netgame.NetworkHostRace(
               srv,
               thePlayer,
               currentTrack,
-              laps,
+              selected_laps,
               remote_player_infos=result.get("roster", []),
             ).run()
             misc.stopMusic()
@@ -442,7 +449,7 @@ def main():
                   break
 
             #misc.startRandomMusic()
-            netgame.NetworkClientRace(
+            race_result = netgame.NetworkClientRace(
               cli,
               joinPlayer,
               track_name=result["track"],
@@ -451,6 +458,8 @@ def main():
               laps=result["laps"],
             ).run()
             misc.stopMusic()
+            if race_result == "leave":
+              break
             # Loop back to lobby for another race
 
 #import profile

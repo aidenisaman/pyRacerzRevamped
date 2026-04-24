@@ -47,6 +47,44 @@ def _draw_chat_overlay(chat_log, input_line=None):
     misc.screen.blit(surf, (4, y))
 
 
+def _run_start_sequence(ct, play=None):
+  """Render pre-race name blink and traffic lights, then clear queued keys."""
+  if play is not None:
+    for _ in range(4):
+      misc.screen.blit(ct.track, (0, 0))
+      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+      play.car.sprite.draw(misc.screen)
+      name_surf = misc.popUpFont.render(play.name, 1, misc.lightColor, (0, 0, 0))
+      nr = name_surf.get_rect()
+      nr.centerx = int(play.car.x)
+      nr.centery = int(play.car.y)
+      misc.screen.blit(name_surf, nr)
+      pygame.display.flip()
+      pygame.time.delay(400)
+
+  img_grey = pygame.transform.rotozoom(
+    pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
+  img_red = pygame.transform.rotozoom(
+    pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+
+  misc.screen.blit(ct.track, (0, 0))
+  misc.screen.blit(img_grey, (int(10 * misc.zoom), int(10 * misc.zoom)))
+  misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+  misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+  pygame.display.flip()
+  pygame.time.delay(1000)
+  for k in range(3):
+    misc.screen.blit(ct.track, (0, 0))
+    for j in range(k + 1):
+      misc.screen.blit(img_red, (int((10 + 80 * j) * misc.zoom), int(10 * misc.zoom)))
+    pygame.display.flip()
+    pygame.time.delay(1000)
+
+  pygame.event.clear()
+  misc.screen.blit(ct.track, (0, 0))
+  pygame.display.flip()
+
+
 def _is_upper_layer(track_name, last_cp):
   if track_name.startswith("desert"):
     return last_cp == 80
@@ -134,48 +172,63 @@ def _advance_progress(play, ct, popUp=None, place=None):
         play.chrono = 0
 
 
-def _resolve_simple_collision(play_a, play_b, track_name):
-  """Cheap host-side collision response for network PvP.
+def _same_collision_layer(track_name, cp_a, cp_b):
+  if track_name.startswith("desert"):
+    return (cp_a == 80) == (cp_b == 80)
+  if track_name.startswith("city"):
+    return (cp_a == 48) == (cp_b == 48)
+  return True
 
-  This avoids full deterministic replay/rollback while still making contact
-  visible and authoritative from the host.
-  """
-  if _is_upper_layer(track_name, play_a.lastCheckpoint) != _is_upper_layer(track_name, play_b.lastCheckpoint):
-    return
 
-  ra = play_a.car.rect
-  rb = play_b.car.rect
-  if not ra.colliderect(rb):
-    return
+def _apply_singleplayer_collision(play, play2):
+  """Mirror the directional collision response used by single-player mode."""
+  playCollisionRects = []
+  play2CollisionRects = []
 
-  ov = ra.clip(rb)
-  if ov.width <= 0 or ov.height <= 0:
-    return
+  listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(0)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  if ov.width < ov.height:
-    push = ov.width / 2.0 + 1.0
-    if play_a.car.x <= play_b.car.x:
-      play_a.car.x -= push
-      play_b.car.x += push
-    else:
-      play_a.car.x += push
-      play_b.car.x -= push
-  else:
-    push = ov.height / 2.0 + 1.0
-    if play_a.car.y <= play_b.car.y:
-      play_a.car.y -= push
-      play_b.car.y += push
-    else:
-      play_a.car.y += push
-      play_b.car.y -= push
+  listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(1)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  sa = float(getattr(play_a.car, "speed", 0.0))
-  sb = float(getattr(play_b.car, "speed", 0.0))
-  play_a.car.speed = -0.30 * sa + 0.20 * sb
-  play_b.car.speed = -0.30 * sb + 0.20 * sa
+  listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(2)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
 
-  play_a.car.rect.center = (int(play_a.car.x), int(play_a.car.y))
-  play_b.car.rect.center = (int(play_b.car.x), int(play_b.car.y))
+  listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+  if listIndex != []:
+    playCollisionRects.append(3)
+    for idx in listIndex:
+      if idx not in play2CollisionRects:
+        play2CollisionRects.append(idx)
+
+  playCollisionRects.sort()
+
+  if playCollisionRects == [0]:
+    play.car.newSpeed = play.car.speed / 2 - abs(play2.car.speed / 2)
+  elif playCollisionRects == [1]:
+    play.car.newSpeed = play.car.speed / 2 + abs(play2.car.speed / 2)
+  elif playCollisionRects == [2] or playCollisionRects == [0, 1, 2] or playCollisionRects == [0, 2] or playCollisionRects == [1, 2]:
+    play.car.speedL = play.car.speedL + abs(play2.car.speed / 2) * 10
+    play.car.newSpeed = 0
+  elif playCollisionRects == [3] or playCollisionRects == [0, 1, 3] or playCollisionRects == [0, 3] or playCollisionRects == [1, 3]:
+    play.car.speedL = play.car.speedL - abs(play2.car.speed / 2) * 10
+    play.car.newSpeed = 0
+  elif playCollisionRects != []:
+    play.car.newSpeed = 0
+
+  return playCollisionRects != []
 
 
 # ===========================================================================
@@ -229,59 +282,33 @@ class NetworkHostRace:
     popUp    = misc.PopUp(ct)
     collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
-    # ── car name blink (same as single race) ────────────────────────
-    for _ in range(4):
-      misc.screen.blit(ct.track, (0, 0))
-      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
-      play.car.sprite.draw(misc.screen)
-      name_surf = misc.popUpFont.render(play.name, 1, misc.lightColor, (0, 0, 0))
-      nr = name_surf.get_rect()
-      nr.centerx = int(play.car.x)
-      nr.centery  = int(play.car.y)
-      misc.screen.blit(name_surf, nr)
-      pygame.display.flip()
-      pygame.time.delay(400)
-
-    # ── traffic lights ───────────────────────────────────────────────
-    img_grey = pygame.transform.rotozoom(
-      pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
-    img_red  = pygame.transform.rotozoom(
-      pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(),  0, misc.zoom)
-
-    misc.screen.blit(ct.track, (0, 0))
-    misc.screen.blit(img_grey, (int(10  * misc.zoom), int(10 * misc.zoom)))
-    misc.screen.blit(img_grey, (int(90  * misc.zoom), int(10 * misc.zoom)))
-    misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
-    pygame.display.flip()
-    pygame.time.delay(1000)
-    for k in range(3):
-      misc.screen.blit(ct.track, (0, 0))
-      for j in range(k + 1):
-        misc.screen.blit(img_red, (int((10 + 80 * j) * misc.zoom), int(10 * misc.zoom)))
-      pygame.display.flip()
-      pygame.time.delay(1000)
-
-    pygame.event.clear()
-    misc.screen.blit(ct.track, (0, 0))
-    pygame.display.flip()
+    _run_start_sequence(ct, play)
+    self.server.broadcast({"type": "go"})
 
     # ── main race loop ───────────────────────────────────────────────
     running = True
+    aborted = False
     while running:
 
       # Events
       for event in pygame.event.get():
         if event.type == QUIT:
           self.server.broadcast({"type": "finish", "standings": []})
-          misc.stopMusic()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
         elif event.type == KEYDOWN:
           if event.key == K_ESCAPE:
             self.server.broadcast({"type": "finish", "standings": []})
-            return
+            aborted = True
+            running = False
+            break
           play.handle_keydown(event.key)
         elif event.type == KEYUP:
           play.handle_keyup(event.key)
+
+      if not running:
+        break
 
       play.update_controls()
 
@@ -357,7 +384,15 @@ class NetworkHostRace:
 
       collision_grid.rebuild(active_players, get_rect=lambda p: p.car.rect)
       for pa, pb in collision_grid.candidate_pairs():
-        _resolve_simple_collision(pa, pb, ct.name)
+        if not _same_collision_layer(ct.name, pa.lastCheckpoint, pb.lastCheckpoint):
+          continue
+        _apply_singleplayer_collision(pa, pb)
+        _apply_singleplayer_collision(pb, pa)
+
+      for rp in active_players:
+        if rp.car.newSpeed != 0:
+          rp.car.speed = rp.car.newSpeed
+          rp.car.newSpeed = 0
 
       # Broadcast authoritative state for every non-DNF racer
       host_tick += 1
@@ -416,6 +451,9 @@ class NetworkHostRace:
 
       clock.tick(100)
 
+    if aborted:
+      return "aborted"
+
     # Race finished
     standings = []
     finish_rank = 1
@@ -453,6 +491,7 @@ class NetworkHostRace:
     misc.screen.blit(finish_surf, fr)
     pygame.display.flip()
     misc.wait4Key()
+    return "finished"
 
 
 # ===========================================================================
@@ -518,6 +557,7 @@ class NetworkWatchRace:
     pygame.display.flip()
 
     running = True
+    aborted = False
 
     while running:
 
@@ -529,8 +569,9 @@ class NetworkWatchRace:
             "name": self.spectator_name,
             "pid":  getattr(self.client, "player_id", -1),
           })
-          self.client.disconnect()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
         elif event.type == KEYDOWN:
           if is_typing:
             if event.key == K_RETURN:
@@ -553,9 +594,13 @@ class NetworkWatchRace:
                 "name": self.spectator_name,
                 "pid":  getattr(self.client, "player_id", -1),
               })
+              aborted = True
               running = False
             elif event.key == K_t:
               is_typing = True
+
+      if not running:
+        break
 
       # Network messages
       for msg in self.client.recv_all():
@@ -633,6 +678,10 @@ class NetworkWatchRace:
       pygame.display.flip()
       clock.tick(60)
 
+    if aborted:
+      self.client.disconnect()
+      return "leave"
+
     # Race over banner
     misc.screen.blit(ct.track, (0, 0))
     over_surf = pygame.transform.rotozoom(
@@ -642,6 +691,7 @@ class NetworkWatchRace:
     misc.screen.blit(over_surf, orect)
     pygame.display.flip()
     misc.wait4Key()
+    return "finished"
 
 
 # ===========================================================================
@@ -711,7 +761,11 @@ class NetworkClientRace:
     is_typing  = False
     tick       = 0
     running    = True
+    aborted    = False
     finish_msg = None
+    race_started = False
+
+    _run_start_sequence(ct, play)
 
     misc.screen.blit(ct.track, (0, 0))
     hint_surf = misc.popUpFont.render("[T] Chat   [ESC] Leave", 1, misc.darkColor, (0, 0, 0))
@@ -724,8 +778,9 @@ class NetworkClientRace:
       for event in pygame.event.get():
         if event.type == QUIT:
           self.client.send({"type": "bye", "name": play.name, "pid": my_pid})
-          self.client.disconnect()
-          sys.exit(0)
+          aborted = True
+          running = False
+          break
 
         elif event.type == KEYDOWN:
           if is_typing:
@@ -743,6 +798,7 @@ class NetworkClientRace:
           else:
             if event.key == K_ESCAPE:
               self.client.send({"type": "bye", "name": play.name, "pid": my_pid})
+              aborted = True
               running = False
             elif event.key == K_t:
               is_typing = True
@@ -755,7 +811,7 @@ class NetworkClientRace:
       if not running:
         break
 
-      if not is_typing:
+      if race_started and not is_typing:
         play.update_controls()
         play.car.update()
         play.chrono += 1
@@ -765,20 +821,21 @@ class NetworkClientRace:
           play.raceFinish = 1
           play.car.blink = 1
 
-      tick += 1
-      self.client.send_state(
-        x=play.car.x / misc.zoom,
-        y=play.car.y / misc.zoom,
-        a=play.car.angle * 1000,
-        br=1 if play.car.brake > 0 else 0,
-        sl=play.car.slide,
-        bl=play.car.blink,
-        cp=play.lastCheckpoint,
-        lap=play.nbLap,
-        race_finish=play.raceFinish,
-        sp=float(getattr(play.car, "speed", 0.0)),
-        tick=tick,
-      )
+      if race_started:
+        tick += 1
+        self.client.send_state(
+          x=play.car.x / misc.zoom,
+          y=play.car.y / misc.zoom,
+          a=play.car.angle * 1000,
+          br=1 if play.car.brake > 0 else 0,
+          sl=play.car.slide,
+          bl=play.car.blink,
+          cp=play.lastCheckpoint,
+          lap=play.nbLap,
+          race_finish=play.raceFinish,
+          sp=float(getattr(play.car, "speed", 0.0)),
+          tick=tick,
+        )
 
       # Network messages
       for msg in self.client.recv_all():
@@ -789,7 +846,7 @@ class NetworkClientRace:
           if pid < 0:
             continue
 
-          if pid == my_pid:
+          if pid == my_pid and race_started:
             # Host-authoritative correction for local racer.
             tx = int(msg.get("x", int(play.car.x / misc.zoom))) * misc.zoom
             ty = int(msg.get("y", int(play.car.y / misc.zoom))) * misc.zoom
@@ -800,13 +857,14 @@ class NetworkClientRace:
             dist = math.hypot(dx, dy)
             play.car.ox = play.car.x
             play.car.oy = play.car.y
-            # Keep client feel responsive: only correct substantial divergence.
-            if dist > 160:
+            # Preserve single-player-like terrain/building collisions by only
+            # correcting large host/client divergence.
+            if dist > 260:
               play.car.x = tx
               play.car.y = ty
-            elif dist > 28:
-              play.car.x += dx * 0.08
-              play.car.y += dy * 0.08
+            elif dist > 120 and abs(getattr(play.car, "speed", 0.0)) < 0.5:
+              play.car.x += dx * 0.18
+              play.car.y += dy * 0.18
 
             d_ang = (ta - play.car.angle + math.pi) % (2 * math.pi) - math.pi
             if abs(d_ang) > 2.2:
@@ -815,8 +873,11 @@ class NetworkClientRace:
               play.car.angle += d_ang * 0.10
 
             play.car.rect.center = (int(play.car.x), int(play.car.y))
-            # Do not overwrite local transient physics (speed/brake/slide)
-            # with delayed echoed states; that creates a "high friction" feel.
+            # Keep local transient controls but blend severe speed mismatches
+            # (typically from host-resolved car-to-car collisions).
+            host_speed = float(msg.get("sp", getattr(play.car, "speed", 0.0)))
+            if abs(host_speed - play.car.speed) > 1.4:
+              play.car.speed = 0.7 * play.car.speed + 0.3 * host_speed
             play.car.blink = msg.get("bl", play.car.blink)
 
             play.lastCheckpoint = msg.get("cp", play.lastCheckpoint)
@@ -848,6 +909,9 @@ class NetworkClientRace:
         elif mtype == "finish":
           finish_msg = msg
           running = False
+
+        elif mtype == "go":
+          race_started = True
 
       # Interpolate remote racers toward authoritative host state
       for pid, rp in remote_cars.items():
@@ -887,10 +951,20 @@ class NetworkClientRace:
       ct.track.unlock()
 
       _draw_chat_overlay(chat_log, chat_input.render_text() if is_typing else None)
+      if not race_started:
+        wait_surf = misc.popUpFont.render("Waiting for host start...", 1, misc.lightColor, (0, 0, 0))
+        wait_rect = wait_surf.get_rect()
+        wait_rect.centerx = misc.screen.get_rect().centerx
+        wait_rect.y = int(36 * misc.zoom)
+        misc.screen.blit(wait_surf, wait_rect)
       misc.screen.blit(hint_surf, (misc.screen.get_width() - hint_surf.get_width() - 4, 4))
 
       pygame.display.flip()
       clock.tick(100)
+
+    if aborted:
+      self.client.disconnect()
+      return "leave"
 
     # End-of-race banner + compact standings if provided by host
     misc.screen.blit(ct.track, (0, 0))
@@ -916,3 +990,4 @@ class NetworkClientRace:
 
     pygame.display.flip()
     misc.wait4Key()
+    return "finished"

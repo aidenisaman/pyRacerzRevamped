@@ -34,11 +34,13 @@ Message types used by the game
               "laps":3,"host_name":"...","host_color":1,
               "host_level":1,
               "roster":[{pid,name,color,level},...]}    host → all before race
+  go       : {"type":"go"}                             host → all, race control unlocked
   state    : {"type":"state",  "pid":0,
               "x":512,"y":384,"a":1570,
               "br":0,"sl":0,"bl":0}                    any direction, per frame
                                                         (pid=0 host; pid>0 client)
   finish   : {"type":"finish"}                         host → all, race over
+  lobby_close : {"type":"lobby_close"}                host → all, lobby closed by host
   bye      : {"type":"bye"}                            client → host on leave
 
 Phase-2 notes
