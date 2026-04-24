@@ -244,12 +244,22 @@ class Game:
             misc.stopMusic()
             sys.exit(0)
           elif event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-              # Stop music
-              misc.stopMusic()
-              return -1
-            for play in self.listPlayer:
-              play.handle_keydown(event.key)
+
+              if event.key == K_ESCAPE:
+                  misc.stopMusic()
+                  return -1
+
+              # Toggle music during race
+              if event.key == K_m:
+                  if misc.music == 1:
+                      misc.music = 0
+                      misc.stopMusic()
+                  else:
+                      misc.music = 1
+                      misc.startRaceMusic(currentTrack.name)
+
+              for play in self.listPlayer:
+                  play.handle_keydown(event.key)
           elif event.type == KEYUP:
             for play in self.listPlayer:
               play.handle_keyup(event.key)
