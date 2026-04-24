@@ -28,7 +28,6 @@ import zlib
 from . import track
 from . import menu
 from . import misc
-from . import collision
 
 import sys
 import os
@@ -36,8 +35,6 @@ import datetime
 
 class Game:
   '''Class representing a game: Tournament or Single Race'''
-  # Class-level cache for checkpoint overlays per track name
-  checkpoint_overlay_cache = {}
 
   def __init__(self, gameType, listTrackName=None, listPlayer=None, maxLapNb=-1):
     '''Constructor'''
@@ -62,36 +59,30 @@ class Game:
         print(e)
         sys.exit(1)
 
-      # Use a cache key based on track name
-      cache_key = (getattr(currentTrack, 'name', str(currentTrackName)), getattr(currentTrack, 'reverse', 0))
-      if cache_key in Game.checkpoint_overlay_cache:
-        checkpoint_overlays = Game.checkpoint_overlay_cache[cache_key]
-      else:
-        checkpoint_overlays = {}
-        if hasattr(currentTrack, 'trackF'):
-          width, height = currentTrack.trackF.get_size()
-          if hasattr(currentTrack, 'nbCheckpoint'):
-            for checkpoint_value in range(16, 16 * (getattr(currentTrack, 'nbCheckpoint', 0) + 1), 16):
-              mask = pygame.Surface((width, height), pygame.SRCALPHA)
-              # Fully Transparent as default
-              mask.fill((0, 0, 0, 0))  
-              for x in range(width):
-                for y in range(height):
-                  r, g, b, *_ = currentTrack.trackF.get_at((x, y))
-                  if r == checkpoint_value:
-                    # Semi Transparent yellow
-                    mask.set_at((x, y), (255, 255, 0, 120))  
-              checkpoint_overlays[checkpoint_value] = mask
-        Game.checkpoint_overlay_cache[cache_key] = checkpoint_overlays
+      currentTrack = track.Track(currentTrackName[0], currentTrackName[1])
+      # --- Checkpoint scan for desert track ---
+      checkpoint_centers = []
+      if currentTrack.name == "desert":
+        checkpoint_positions = {i: [] for i in range(16, 16 * (currentTrack.nbCheckpoint + 1), 16)}
+        width, height = currentTrack.trackF.get_size()
+        for x in range(0, width, 4):
+          for y in range(0, height, 4):
+            r, g, b, *_ = currentTrack.trackF.get_at((x, y))
+            if r in checkpoint_positions:
+              checkpoint_positions[r].append((x, y))
+        for positions in checkpoint_positions.values():
+          if positions:
+            avg_x = sum(p[0] for p in positions) // len(positions)
+            avg_y = sum(p[1] for p in positions) // len(positions)
+            checkpoint_centers.append((avg_x, avg_y))
 
       # Play music
-      #misc.startRandomMusic()
+      misc.startRandomMusic()
 
       # Put players on the rank
       # If it's the first time do Randomly
       if currentTrackName == self.listTrackName[0]:
         listRank = []
-
         for play in self.listPlayer:
           rank = -1
           while rank in listRank or rank == -1:
@@ -105,14 +96,6 @@ class Game:
 
       # Initialise clock
       clock = pygame.time.Clock()
-      # Broad-phase grid: cell_size ~2× car sizeRect (30*zoom) for efficient hashing
-      _collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
-
-      # Let AI players inspect the race roster when using new architecture.
-      for play in self.listPlayer:
-        if hasattr(play, "set_race_context"):
-          play.set_race_context(self.listPlayer)
-
 
       # Display player names and cars blinking...
       for i in range(0, 4):
@@ -160,93 +143,33 @@ class Game:
       for r in range(1, self.maxLapNb+1):
         bestRank.append(1)
 
-      # Display Lights (Red, Orange, Green - like traffic light)
+      # Display Fires
       imgFireG = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
       misc.screen.blit(imgFireG, (10*misc.zoom,10*misc.zoom))
       misc.screen.blit(imgFireG, (90*misc.zoom,10*misc.zoom))
       misc.screen.blit(imgFireG, (170*misc.zoom,10*misc.zoom))
       pygame.display.flip()
       pygame.time.delay(1000)
-
-      # Prepare countdown font
-      countdownFont = pygame.font.Font(None, int(150*misc.zoom))
-
-      # Try to load countdown sound: prefer project `sounds/`, else copy from Downloads, else fall back to bundled countdowns
-      # Load countdown sound only from project files
-      countdown_sound = None
-      countdown_channel = None
-
-      for candidate in (
-          "mixkit-melodic-race-countdown-1955.wav",
-          "countdown_go.wav",
-          "race_start.wav",
-          "countdown_3.wav",
-          "countdown_2.wav",
-          "countdown_1.wav",
-      ):
-          cand_path = os.path.join("sounds", candidate)
-          if os.path.exists(cand_path):
-              try:
-                  countdown_sound = pygame.mixer.Sound(cand_path)
-                  break
-              except Exception:
-                  countdown_sound = None
-
-      # Show RED light (first signal) with countdown "3"
-      imgFireRed = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireRed, (10*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("3", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      # Restore only the countdown area from track to preserve lights/background
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
-      if countdown_sound:
-        try:
-          # Extend final beep by +1s so it's still audible when race starts
-          countdown_channel = countdown_sound.play(maxtime=2500)
-        except Exception:
-          countdown_channel = None
+      imgFire = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+      misc.screen.blit(imgFire, (10*misc.zoom,10*misc.zoom))
+      #misc.screen.blit(imgFire, (90*misc.zoom,10*misc.zoom))
+      #misc.screen.blit(imgFire, (170*misc.zoom,10*misc.zoom))
       pygame.display.flip()
       pygame.time.delay(1000)
-
-      # Show ORANGE light (second signal) with countdown "2"
-      imgFireOrange = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireOrange, (90*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("2", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
-      if countdown_sound:
-        try:
-          countdown_channel = countdown_sound.play(maxtime=1500)
-        except Exception:
-          countdown_channel = None
+      imgFire = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+      #misc.screen.blit(imgFire, (10*misc.zoom,10*misc.zoom))
+      misc.screen.blit(imgFire, (90*misc.zoom,10*misc.zoom))
+      #misc.screen.blit(imgFire, (170*misc.zoom,10*misc.zoom))
       pygame.display.flip()
       pygame.time.delay(1000)
-
-      # Show GREEN light (third signal - GO!) with countdown "1"
-      imgFireGreen = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireGreen, (170*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("1", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
-      if countdown_sound:
-        try:
-          countdown_channel = countdown_sound.play(maxtime=1500)
-        except Exception:
-          countdown_channel = None
+      imgFire = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+      #misc.screen.blit(imgFireG, (10*misc.zoom,10*misc.zoom))
+      #misc.screen.blit(imgFireG, (90*misc.zoom,10*misc.zoom))
+      misc.screen.blit(imgFire, (170*misc.zoom,10*misc.zoom))
       pygame.display.flip()
       pygame.time.delay(990)
 
       # Clear event queue
-      # Let the countdown sound finish naturally (do not force-stop here)
       pygame.event.clear()
 
       # Display the track
@@ -259,25 +182,20 @@ class Game:
 
       # Event loop
       while raceFinish == 0:
-        #Draw the track
+        #event handling and game logic
+        l = []  # Clear dirty rects at the start of each frame
         misc.screen.blit(currentTrack.track, (0, 0))
-
-        #Draw yellow overlays for each player's next checkpoint 
-        if checkpoint_overlays:
-          drawn_checkpoints = set()
+        # Only show the next checkpoint for each player
+        if currentTrack.name == "desert":
+          checkpoint_values = list(range(16, 16 * (currentTrack.nbCheckpoint + 1), 16))
           for play in self.listPlayer:
             next_checkpoint_value = play.lastCheckpoint + 16
-            if next_checkpoint_value in checkpoint_overlays and next_checkpoint_value not in drawn_checkpoints:
-              misc.screen.blit(checkpoint_overlays[next_checkpoint_value], (0, 0))
-              drawn_checkpoints.add(next_checkpoint_value)
+            if next_checkpoint_value in checkpoint_values:
+              idx = checkpoint_values.index(next_checkpoint_value)
+              pos = checkpoint_centers[idx]
+              pygame.draw.circle(misc.screen, (255, 0, 0), pos, 10)
 
-        # Draw cars
-        for play in self.listPlayer:
-          play.car.sprite.draw(misc.screen)
-
-        pygame.display.flip()  
-
-        # Get the event keys
+        #Get the event Keys
         for event in pygame.event.get():
 
           if event.type == QUIT:
@@ -290,14 +208,49 @@ class Game:
               misc.stopMusic()
               return -1
             for play in self.listPlayer:
-              play.handle_keydown(event.key)
+              if play.__class__.__name__ == "HumanPlayer":
+                if event.key == play.keyAccel:
+                  play.keyAccelPressed = 1
+                if event.key == play.keyBrake:
+                  play.keyBrakePressed = 1
+                if event.key == play.keyLeft:
+                  play.keyLeftPressed = 1
+                if event.key == play.keyRight:
+                  play.keyRightPressed = 1
           elif event.type == KEYUP:
             for play in self.listPlayer:
-              play.handle_keyup(event.key)
+              if play.__class__.__name__ == "HumanPlayer":
+                if event.key == play.keyAccel:
+                  play.keyAccelPressed = 0
+                if event.key == play.keyBrake:
+                  play.keyBrakePressed = 0
+                if event.key == play.keyLeft:
+                  play.keyLeftPressed = 0
+                if event.key == play.keyRight:
+                  play.keyRightPressed = 0
 
-        # Apply per-player control updates
+        # Make some modifications on the car commands
         for play in self.listPlayer:
-          play.update_controls()
+
+          # Bot players need to compute
+          if play.__class__.__name__ == "RobotPlayer":
+            play.compute()
+
+          if play.__class__.__name__ == "HumanPlayer" or play.__class__.__name__ == "RobotPlayer":
+            if play.keyAccelPressed == 1:
+              play.car.doAccel()
+            else:
+              play.car.noAccel()
+            if play.keyBrakePressed == 1:
+              play.car.doBrake()
+            else:
+              play.car.noBrake()
+            if play.keyLeftPressed == 1:
+              play.car.doLeft()
+            if play.keyRightPressed == 1:
+              play.car.doRight()
+            if play.keyLeftPressed == 0 and play.keyRightPressed == 0:
+              play.car.noWheel()
 
         # TODO ? Manage Rect.union (oldRect and newRect of a car) to optimize !!!!
         # Append the old rect to the dirty Rects
@@ -321,7 +274,7 @@ class Game:
           if currentTrack.reverse == 0 and play.raceFinish == 0:
             if r == play.lastCheckpoint + 16:
               play.lastCheckpoint = r
-              # print "Checkpoint OK"
+              #print "Checkpoint OK"
             # We finish a lap
             elif r == 16:
               # OK
@@ -333,7 +286,7 @@ class Game:
                 play.rank = bestRank[play.nbLap]
                 bestRank[play.nbLap] = bestRank[play.nbLap] + 1
 
-                # Get the best chrono
+                # Get the best chrono   
                 if play.chrono < play.bestChrono:
                   play.bestChrono = play.chrono
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
@@ -342,7 +295,7 @@ class Game:
 
                 play.chrono = 0
 
-                # NOK
+              # NOK
               elif play.lastCheckpoint > 16:
                 play.lastCheckpoint = r
                 popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
@@ -351,10 +304,10 @@ class Game:
           elif currentTrack.reverse == 1 and play.raceFinish == 0:
             if r != 0 and r == play.lastCheckpoint - 16:
               play.lastCheckpoint = r
-              # print "Checkpoint OK"
-            #We finish a lap
+              #print "Checkpoint OK"
+            # We finish a lap
             elif r == 16 * currentTrack.nbCheckpoint:
-              #OK
+              # OK
               if play.lastCheckpoint == 16:
                 play.lastCheckpoint = r
                 play.nbLap = play.nbLap +1
@@ -369,9 +322,9 @@ class Game:
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
                 else:
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
-                
+
                 play.chrono = 0
-              
+
               # NOK
               elif play.lastCheckpoint < 16 * currentTrack.nbCheckpoint:
                 play.lastCheckpoint = r
@@ -380,75 +333,55 @@ class Game:
 
         # Manage Collisions
         for play in self.listPlayer:
-          for play2 in self.listPlayer:
-            if play == play2:
-              continue
-           # Prevent collisions between cars on different bridge levels in desert tracks
-            if currentTrack.name.startswith("desert"):
-             # Only allow collision if both are on the bridge (80) or both are not
-              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
-                continue
-            if currentTrack.name.startswith("city"):
-              if (play.lastCheckpoint == 48) != (play2.lastCheckpoint == 48):
-                continue
-        # Manage Collisions — broad-phase spatial grid reduces candidate pairs.
-        # Rebuild the grid each frame (O(n)), then only run the expensive
-        # narrow-phase rect tests on pairs that share a grid cell.
-        _collision_grid.rebuild(self.listPlayer, get_rect=lambda p: p.car.rect)
-        for _pa, _pb in _collision_grid.candidate_pairs():
-          # Process both orderings so each car gets its own directional response.
-          for play, play2 in ((_pa, _pb), (_pb, _pa)):
-            # Prevent collisions between cars on different bridge levels in desert tracks
-            if currentTrack.name.startswith("desert"):
-              # Only allow collision if both are on the bridge (80) or both are not
-              if (play.lastCheckpoint == 80) != (play2.lastCheckpoint == 80):
-                continue
-            playCollisionRects = []
-            play2CollisionRects = []
-            listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
-            if listIndex != []:
-              playCollisionRects.append(0)
-              for idx in listIndex:
-                if idx not in play2CollisionRects:
-                  play2CollisionRects.append(idx)
-            listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
-            if listIndex != []:
-              playCollisionRects.append(1)
-              for idx in listIndex:
-                if idx not in play2CollisionRects:
-                  play2CollisionRects.append(idx)
-            listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
-            if listIndex != []:
-              playCollisionRects.append(2)
-              for idx in listIndex:
-                if idx not in play2CollisionRects:
-                  play2CollisionRects.append(idx)
-            listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
-            if listIndex != []:
-              playCollisionRects.append(3)
-              for idx in listIndex:
-                if idx not in play2CollisionRects:
-                  play2CollisionRects.append(idx)
+         for play2 in self.listPlayer:
+           if play == play2:
+             continue
+           playCollisionRects = []
+           play2CollisionRects = []
+           listIndex = pygame.Rect(play.car.listCarRect[0]).collidelistall(play2.car.listCarRect)
+           if listIndex != []:
+             playCollisionRects.append(0)
+             for idx in listIndex:
+               if idx not in play2CollisionRects:
+                 play2CollisionRects.append(idx)
+           listIndex = pygame.Rect(play.car.listCarRect[1]).collidelistall(play2.car.listCarRect)
+           if listIndex != []:
+             playCollisionRects.append(1)
+             for idx in listIndex:
+               if idx not in play2CollisionRects:
+                 play2CollisionRects.append(idx)
+           listIndex = pygame.Rect(play.car.listCarRect[2]).collidelistall(play2.car.listCarRect)
+           if listIndex != []:
+             playCollisionRects.append(2)
+             for idx in listIndex:
+               if idx not in play2CollisionRects:
+                 play2CollisionRects.append(idx)
+           listIndex = pygame.Rect(play.car.listCarRect[3]).collidelistall(play2.car.listCarRect)
+           if listIndex != []:
+             playCollisionRects.append(3)
+             for idx in listIndex:
+               if idx not in play2CollisionRects:
+                 play2CollisionRects.append(idx)
 
-            playCollisionRects.sort()
-            play2CollisionRects.sort()
-            #if playCollisionRects != []:
-              #print playCollisionRects
-            if playCollisionRects == [0]:
-              play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
-            elif playCollisionRects == [1]:
-              play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
-            elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
-              play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
-              play.car.newSpeed = 0
-            elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
-              play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
-              play.car.newSpeed = 0
-            elif playCollisionRects != [] :
-              #TODO
-              #print "Strange Collision !!!"
-              #print playCollisionRects
-              play.car.newSpeed = 0
+           playCollisionRects.sort()
+           play2CollisionRects.sort()
+           #if playCollisionRects != []:
+             #print playCollisionRects
+           if playCollisionRects == [0]:
+             play.car.newSpeed = play.car.speed/2 - abs(play2.car.speed/2)
+           elif playCollisionRects == [1]:
+             play.car.newSpeed = play.car.speed/2 + abs(play2.car.speed/2)
+           elif playCollisionRects == [2] or playCollisionRects == [0,1,2] or playCollisionRects == [0,2] or playCollisionRects == [1,2]:
+             play.car.speedL = play.car.speedL + abs(play2.car.speed/2)*10
+             play.car.newSpeed = 0
+           elif playCollisionRects == [3] or playCollisionRects == [0,1,3] or playCollisionRects == [0,3] or playCollisionRects == [1,3]:
+             play.car.speedL = play.car.speedL - abs(play2.car.speed/2)*10
+             play.car.newSpeed = 0
+           elif playCollisionRects != [] :
+             #TODO
+             #print "Strange Collision !!!"
+             #print playCollisionRects
+             play.car.newSpeed = 0
         
         for play in self.listPlayer:
           #print play.name
@@ -461,9 +394,10 @@ class Game:
         popUp.display()
         l.append(popUp.rect.__copy__())
 
-        # Assume race is complete; any unfinished player below will clear it.
         raceFinish = 1
 
+        currentTrack.track.lock()
+        # Display and manage finished game
         for play in self.listPlayer:
 
           # Change the car sprite
@@ -473,21 +407,17 @@ class Game:
             play.car.image=play.car.cars2[int((256.0*play.car.angle/2.0/math.pi)%256)].copy()
 
           # If there's something on the car (the car is in a tunnel), manage mask to hide the car
-          # Specific code for desertf in which the car will be shown above overpass at checkpoint 5 (red=80), reverts when reaching checkpoint 6 (red=96)
-          if (currentTrack.name.startswith("desert") and play.lastCheckpoint == 80) or (currentTrack.name.startswith("city") and play.lastCheckpoint == 48):
-            pass
-          else:
-            part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
-            part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
-            partArray = pygame.surfarray.array2d(part)
-            aX = 0
-            for arrayX in partArray:
-              aY = 0
-              for col in arrayX:
-                if col % 256 != 0:
-                  play.car.image.set_at((aX, aY), (255, 255, 255, 0))
-                aY = aY + 1
-              aX = aX + 1
+          part=pygame.Surface((play.car.sizeRect,play.car.sizeRect), HWSURFACE, 24).convert()
+          part.blit(currentTrack.trackF, (0,0), (play.car.x-play.car.sizeRect/2, play.car.y-play.car.sizeRect/2, play.car.sizeRect, play.car.sizeRect))
+          partArray = pygame.surfarray.array2d(part)
+          aX = 0
+          for arrayX in partArray:
+            aY = 0
+            for col in arrayX:
+              if col % 256 != 0:
+                play.car.image.set_at((aX, aY), (255, 255, 255, 0))
+              aY = aY + 1
+            aX = aX + 1
 
           # Display tires slide
           if play.car.slide == 1 or play.car.slide == 2:
@@ -519,15 +449,13 @@ class Game:
 
 
           # Test if the player has finished
-          if play.nbLap >= self.maxLapNb and play.raceFinish != 1:
+          if play.nbLap == self.maxLapNb and play.raceFinish != 1:
             play.raceFinish = 1
             play.car.blink = 1
 
-
           # Test is somebody has not finished
-          if play.nbLap < self.maxLapNb:
+          if play.nbLap != self.maxLapNb:
             raceFinish = 0
-
 
           # Blink = 0, no blink
           if play.car.blink == 0:
@@ -568,7 +496,7 @@ class Game:
           else:
             nbFrame = nbFrame + 1
 
-          pygame.display.update(l)
+          pygame.display.flip()
           i=0
           l = []
         else:
@@ -603,74 +531,15 @@ class Game:
       popUp.display()
       l.append(popUp.rect.__copy__())
       
-      # Display celebration screen showing player positions
-      misc.screen.blit(currentTrack.track, (0, 0))
-      
-      # Create a semi-transparent background for results
-      background_surface = pygame.Surface((int(400*misc.zoom), int(500*misc.zoom)))
-      background_surface.fill((30, 30, 60))  # Dark blue background
-      background_surface.set_alpha(200)  # Semi-transparent
-      background_rect = background_surface.get_rect()
-      background_rect.centerx = misc.screen.get_rect().centerx
-      background_rect.y = int(40*misc.zoom)
-      misc.screen.blit(background_surface, background_rect)
-      
-      # Title - Race Results
-      titleText = misc.titleFont.render("RACE RESULTS", 1, misc.lightColor)
-      titleRect = titleText.get_rect()
-      titleRect.centerx = misc.screen.get_rect().centerx
-      titleRect.y = int(60*misc.zoom)
-      misc.screen.blit(titleText, titleRect)
-      
-      # Display player positions
-      y_pos = int(160*misc.zoom)
-      for play in sorted(self.listPlayer, key=lambda p: p.rank):
-        # Get position ordinal (1st, 2nd, 3rd, etc.)
-        pos = play.rank
-        if pos == 1:
-          position_text = "1st"
-          position_color = (255, 215, 0)  # Gold
-        elif pos == 2:
-          position_text = "2nd"
-          position_color = (192, 192, 192)  # Silver
-        elif pos == 3:
-          position_text = "3rd"
-          position_color = (205, 127, 50)  # Bronze
-        else:
-          position_text = str(pos) + "th"
-          position_color = misc.lightColor
-        
-        # Display position and player name
-        result_text = misc.popUpFont.render(position_text + " Place: " + play.name, 1, position_color)
-        resultRect = result_text.get_rect()
-        resultRect.centerx = misc.screen.get_rect().centerx
-        resultRect.y = y_pos
-        misc.screen.blit(result_text, resultRect)
-        y_pos = y_pos + int(60*misc.zoom)
-      
-      # Display "press any key to continue" at the bottom
-      continue_text = misc.itemFont.render("Press ENTER to continue", 1, misc.lightColor)
-      continueRect = continue_text.get_rect()
-      continueRect.centerx = misc.screen.get_rect().centerx
-      continueRect.y = int(630*misc.zoom)
-      misc.screen.blit(continue_text, continueRect)
-      
+      text = pygame.transform.rotozoom(misc.bigFont.render("Race finish, press a key to continue", 1, misc.lightColor), 20, 1)
+      textRect = text.get_rect()
+      textRect.centerx = misc.screen.get_rect().centerx
+      textRect.centery = misc.screen.get_rect().centery
+      misc.screen.blit(text, textRect)
+
       pygame.display.flip()
-      pygame.time.delay(3000)  # Show results for 3 seconds
-      
-      # Wait for ENTER key only
-      pygame.event.clear()
-      waiting = True
-      while waiting:
-        for event in pygame.event.get():
-          if event.type == QUIT:
-            misc.stopMusic()
-            sys.exit(0)
-          if event.type == KEYDOWN:
-            if event.key == K_RETURN:
-              waiting = False
-              break
-        pygame.time.delay(10)
+
+      misc.wait4Key()
 
       
       menu1 = menu.SimpleMenu(misc.titleFont, "save Replay?", 20*misc.zoom, misc.itemFont, ["No", "Yes"])
@@ -682,21 +551,25 @@ class Game:
         
         waitMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "recording Replay...")
 
-        if select2 is not None and select2 != "":
-          # Build text header then write binary frame data
-          header = (
-            f"{misc.VERSION} {currentTrack.name} {currentTrack.reverse} "
-            f"{masterChrono} {len(self.listPlayer)} "
-          )
-          for play in self.listPlayer:
-            header += f"{play.name} {play.car.color} {play.car.level} "
-          header += "\n"
+        if select2 != None and select2 != "":
+          f = open(os.path.join("replays", select2 + ".rep"), "wb")
 
-          with open(os.path.join("replays", select2 + ".rep"), "wb") as f:
-            f.write(header.encode())
-            # Serialize frame array as raw binary (5 signed 16-bit ints per
-            # player per frame), then zlib-compress for compact storage.
-            f.write(zlib.compress(replayArray.tobytes()))
+          # TrackName Inv NbEnreg NbCar PlayerName1 PlayerCarColor1 PlayerCarLevel1...
+          f.write(str(misc.VERSION) + " " + currentTrack.name + " " + str(currentTrack.reverse) + " " + str(masterChrono) + " " + str(len(self.listPlayer)) + " ")
+          for play in self.listPlayer:
+            f.write(play.name + " " + str(play.car.color) + " " + str(play.car.level) + " ")
+          f.write("\n")
+
+          # Put the array into the Replay File
+          stringFile = ""
+          try:
+            while 1:
+              stringFile = stringFile + str(replayArray.pop(0)) + " "
+          except Exception:
+            pass
+          f.write(zlib.compress(stringFile))
+
+          f.close()
 
       self.computeScores(currentTrack)
 
@@ -745,9 +618,6 @@ class Game:
 
       playCar = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "cars", "car" + str(play.car.color) + ".png")).convert_alpha(), 270, 1.2*misc.zoom)
 
-      # Default text for non-tournament modes
-      text = None
-
       # If it's a tournament, compute points
       if self.gameType == "tournament":
         if bestChrono == 1:
@@ -756,13 +626,20 @@ class Game:
           else:
             text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " + 2 = " + str(play.point+morePoint+2) + "  >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
           play.point = play.point + morePoint + 2
-      
-      # For single-race modes (non-tournament), display rank and chrono
-      if text is None:
-        if bestChrono == 1:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
+
         else:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
+          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " = " + str(play.point+morePoint) + "     " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
+          play.point = play.point + morePoint
+
+      else:
+
+        if bestChrono == 1:
+          if misc.addHiScore(track, play) == 1:
+            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
+          else:
+            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
+        else:
+          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :    " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
 
       # Display the car with statistics
       playCarRect = playCar.get_rect()
