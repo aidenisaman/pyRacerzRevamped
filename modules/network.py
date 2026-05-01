@@ -34,11 +34,13 @@ Message types used by the game
               "laps":3,"host_name":"...","host_color":1,
               "host_level":1,
               "roster":[{pid,name,color,level},...]}    host → all before race
+  go       : {"type":"go"}                             host → all, race control unlocked
   state    : {"type":"state",  "pid":0,
               "x":512,"y":384,"a":1570,
               "br":0,"sl":0,"bl":0}                    any direction, per frame
                                                         (pid=0 host; pid>0 client)
   finish   : {"type":"finish"}                         host → all, race over
+  lobby_close : {"type":"lobby_close"}                host → all, lobby closed by host
   bye      : {"type":"bye"}                            client → host on leave
 
 Phase-2 notes
@@ -187,13 +189,16 @@ class NetworkServer:
     with self._lock:
       self._prune()
       for c in self._clients:
-        c.send(msg)
+        if c and c.alive:
+          c.send(msg)
 
   def send_to(self, idx, msg):
     """Send *msg* to one client by its index in the connection list."""
     with self._lock:
       if 0 <= idx < len(self._clients):
-        self._clients[idx].send(msg)
+        conn = self._clients[idx]
+        if conn and conn.alive:
+          conn.send(msg)
 
   def recv_all(self):
     """Drain messages from all clients.
@@ -202,15 +207,16 @@ class NetworkServer:
     with self._lock:
       self._prune()
       for i, c in enumerate(self._clients):
-        for m in c.recv_all():
-          m["_client_idx"] = i
-          msgs.append(m)
+        if c and c.alive:
+          for m in c.recv_all():
+            m["_client_idx"] = i
+            msgs.append(m)
     return msgs
 
   def client_count(self):
     with self._lock:
       self._prune()
-      return len(self._clients)
+      return len([c for c in self._clients if c and c.alive])
 
   def register_player(self, client_idx, name, color=1, level=1):
     """Assign a stable pid to a client. Call when their 'hello' is processed.
@@ -242,6 +248,17 @@ class NetworkServer:
     with self._lock:
       return self._player_registry.get(client_idx, {}).get("pid", -1)
 
+  def get_player(self, client_idx):
+    """Return the player metadata for a connected client index."""
+    with self._lock:
+      return self._player_registry.get(client_idx)
+
+  def remove_player(self, client_idx):
+    """Remove a player from the server-side registry."""
+    with self._lock:
+      if client_idx in self._player_registry:
+        del self._player_registry[client_idx]
+
 
   def stop(self):
     self._running = False
@@ -251,13 +268,19 @@ class NetworkServer:
       pass
     with self._lock:
       for c in self._clients:
-        c.disconnect()
+        if c:
+          c.disconnect()
       self._clients.clear()
+      self._player_registry.clear()
 
   # ------------------------------------------------------------------
   def _prune(self):
     """Remove dead connections (caller must hold _lock)."""
-    self._clients = [c for c in self._clients if c.alive]
+    for idx, conn in enumerate(self._clients):
+      if conn and not conn.alive:
+        self._clients[idx] = None
+        if idx in self._player_registry:
+          del self._player_registry[idx]
 
   def _accept_loop(self):
     while self._running:
@@ -311,7 +334,7 @@ class NetworkClient:
       self._conn.disconnect()
       self._conn = None
 
-  def send_state(self, x, y, a, br=0, sl=0, bl=0):
+  def send_state(self, x, y, a, br=0, sl=0, bl=0, cp=0, lap=0, race_finish=0, sp=0.0, tick=0):
     """Phase-2 convenience: send a per-frame car-state packet.
 
     Coordinates must already be in track-space (divided by zoom).
@@ -322,6 +345,11 @@ class NetworkClient:
       "pid":  self.player_id,
       "x": int(x), "y": int(y), "a": int(a),
       "br": br, "sl": sl, "bl": bl,
+      "cp": int(cp),
+      "lap": int(lap),
+      "rf": 1 if race_finish else 0,
+      "sp": float(sp),
+      "tick": int(tick),
     })
 
   @property

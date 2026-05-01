@@ -358,16 +358,20 @@ def main():
         srv = network.NetworkServer()
         srv.start()
 
+        selected_track_name = trackInfo[0]
+        selected_track_rev = trackInfo[1]
+        selected_laps = laps
+
         # Lobby → Race loop (keeps cycling until host closes lobby)
         while True:
           lobby = menu.NetworkLobbyMenu(
             srv, is_host=True,
             local_name=hostName,
-            track_name=trackInfo[0],
-            track_rev=trackInfo[1],
+            track_name=selected_track_name,
+            track_rev=selected_track_rev,
             host_color=thePlayer.car.color,
             host_level=thePlayer.car.level,
-            laps=laps,
+            laps=selected_laps,
           )
           result = lobby.getInput()
 
@@ -375,9 +379,18 @@ def main():
             break   # srv already stopped inside lobby
 
           elif result["action"] == "start":
-            currentTrack = track.Track(trackInfo[0], trackInfo[1])
-            misc.startRandomMusic()
-            netgame.NetworkHostRace(srv, thePlayer, currentTrack, laps).run()
+            selected_track_name = result.get("track", selected_track_name)
+            selected_track_rev = result.get("reverse", selected_track_rev)
+            selected_laps = result.get("laps", selected_laps)
+            currentTrack = track.Track(selected_track_name, selected_track_rev)
+            #misc.startRandomMusic()
+            netgame.NetworkHostRace(
+              srv,
+              thePlayer,
+              currentTrack,
+              selected_laps,
+              remote_player_infos=result.get("roster", []),
+            ).run()
             misc.stopMusic()
             # Loop back to lobby for another race
 
@@ -385,6 +398,12 @@ def main():
       elif net_mode == "join":
         ip = menu.NetworkIPMenu(misc.titleFont, misc.itemFont).getInput()
         if not ip:
+          continue
+
+        joinPlayer = menu.ChooseHumanPlayerMenu(
+          misc.titleFont, "network: choosePlayer",
+          5 * misc.zoom, misc.itemFont).getInput()
+        if joinPlayer == -1:
           continue
 
         playerName = menu.ChooseTextMenu(
@@ -401,7 +420,12 @@ def main():
           misc.wait4Key()
           continue
 
-        cli.send({"type": "hello", "name": playerName})
+        cli.send({
+          "type": "hello",
+          "name": playerName,
+          "color": joinPlayer.car.color,
+          "level": joinPlayer.car.level,
+        })
 
         # Lobby → Watch loop (cycles until client leaves)
         while True:
@@ -415,19 +439,33 @@ def main():
             break   # cli already disconnected inside lobby
 
           elif result["action"] == "start":
-            misc.startRandomMusic()
-            netgame.NetworkWatchRace(
+            host_info = {
+              "pid": 0,
+              "name": result["host_name"],
+              "color": result["host_color"],
+              "level": result["host_level"],
+            }
+            roster = [host_info] + [p for p in result.get("roster", []) if p.get("pid", 0) != 0]
+
+            # Fallback assignment if assigned packet arrived late.
+            if cli.player_id < 0:
+              for info in roster:
+                if info.get("name") == playerName and info.get("color") == joinPlayer.car.color:
+                  cli.player_id = info.get("pid", -1)
+                  break
+
+            #misc.startRandomMusic()
+            race_result = netgame.NetworkClientRace(
               cli,
-              spectator_name=playerName,
-              host_name=result["host_name"],
-              host_color=result["host_color"],
-              host_level=result["host_level"],
+              joinPlayer,
               track_name=result["track"],
               track_reverse=result["reverse"],
+              remote_player_infos=roster,
               laps=result["laps"],
-              remote_player_infos=result.get("roster", []),
             ).run()
             misc.stopMusic()
+            if race_result == "leave":
+              break
             # Loop back to lobby for another race
 
 #import profile

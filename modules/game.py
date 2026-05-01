@@ -36,6 +36,8 @@ import datetime
 
 class Game:
   '''Class representing a game: Tournament or Single Race'''
+  # Class-level cache for checkpoint overlays per track name
+  checkpoint_overlay_cache = {}
 
   def __init__(self, gameType, listTrackName=None, listPlayer=None, maxLapNb=-1):
     '''Constructor'''
@@ -60,6 +62,28 @@ class Game:
         print(e)
         sys.exit(1)
 
+      # Use a cache key based on track name
+      cache_key = (getattr(currentTrack, 'name', str(currentTrackName)), getattr(currentTrack, 'reverse', 0))
+      if cache_key in Game.checkpoint_overlay_cache:
+        checkpoint_overlays = Game.checkpoint_overlay_cache[cache_key]
+      else:
+        checkpoint_overlays = {}
+        if hasattr(currentTrack, 'trackF'):
+          width, height = currentTrack.trackF.get_size()
+          if hasattr(currentTrack, 'nbCheckpoint'):
+            for checkpoint_value in range(16, 16 * (getattr(currentTrack, 'nbCheckpoint', 0) + 1), 16):
+              mask = pygame.Surface((width, height), pygame.SRCALPHA)
+              # Fully Transparent as default
+              mask.fill((0, 0, 0, 0))  
+              for x in range(width):
+                for y in range(height):
+                  r, g, b, *_ = currentTrack.trackF.get_at((x, y))
+                  if r == checkpoint_value:
+                    # Semi Transparent yellow
+                    mask.set_at((x, y), (255, 255, 0, 120))  
+              checkpoint_overlays[checkpoint_value] = mask
+        Game.checkpoint_overlay_cache[cache_key] = checkpoint_overlays
+
       # Play music
       #misc.startRandomMusic()
 
@@ -67,6 +91,7 @@ class Game:
       # If it's the first time do Randomly
       if currentTrackName == self.listTrackName[0]:
         listRank = []
+
         for play in self.listPlayer:
           rank = -1
           while rank in listRank or rank == -1:
@@ -234,7 +259,23 @@ class Game:
 
       # Event loop
       while raceFinish == 0:
-        raceFinish = 1
+        #Draw the track
+        misc.screen.blit(currentTrack.track, (0, 0))
+
+        #Draw yellow overlays for each player's next checkpoint 
+        if checkpoint_overlays:
+          drawn_checkpoints = set()
+          for play in self.listPlayer:
+            next_checkpoint_value = play.lastCheckpoint + 16
+            if next_checkpoint_value in checkpoint_overlays and next_checkpoint_value not in drawn_checkpoints:
+              misc.screen.blit(checkpoint_overlays[next_checkpoint_value], (0, 0))
+              drawn_checkpoints.add(next_checkpoint_value)
+
+        # Draw cars
+        for play in self.listPlayer:
+          play.car.sprite.draw(misc.screen)
+
+        pygame.display.flip()  
 
         # Get the event keys
         for event in pygame.event.get():
@@ -290,7 +331,7 @@ class Game:
           if currentTrack.reverse == 0 and play.raceFinish == 0:
             if r == play.lastCheckpoint + 16:
               play.lastCheckpoint = r
-              #print "Checkpoint OK"
+              # print "Checkpoint OK"
             # We finish a lap
             elif r == 16:
               # OK
@@ -302,7 +343,7 @@ class Game:
                 play.rank = bestRank[play.nbLap]
                 bestRank[play.nbLap] = bestRank[play.nbLap] + 1
 
-                # Get the best chrono   
+                # Get the best chrono
                 if play.chrono < play.bestChrono:
                   play.bestChrono = play.chrono
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
@@ -311,7 +352,7 @@ class Game:
 
                 play.chrono = 0
 
-              # NOK
+                # NOK
               elif play.lastCheckpoint > 16:
                 play.lastCheckpoint = r
                 popUp.addElement(play.car, play.name + " L" + str(play.nbLap+1) + " MISSED")
@@ -320,10 +361,10 @@ class Game:
           elif currentTrack.reverse == 1 and play.raceFinish == 0:
             if r != 0 and r == play.lastCheckpoint - 16:
               play.lastCheckpoint = r
-              #print "Checkpoint OK"
-            # We finish a lap
+              # print "Checkpoint OK"
+            #We finish a lap
             elif r == 16 * currentTrack.nbCheckpoint:
-              # OK
+              #OK
               if play.lastCheckpoint == 16:
                 play.lastCheckpoint = r
                 play.nbLap = play.nbLap +1
@@ -338,9 +379,9 @@ class Game:
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono) + "B")
                 else:
                   popUp.addElement(play.car, play.name + " L" + str(play.nbLap) + " P" + str(play.rank) + " " + misc.chrono2Str(play.chrono))
-
+                
                 play.chrono = 0
-
+              
               # NOK
               elif play.lastCheckpoint < 16 * currentTrack.nbCheckpoint:
                 play.lastCheckpoint = r
@@ -430,6 +471,9 @@ class Game:
         popUp.display()
         l.append(popUp.rect.__copy__())
 
+        # Assume race is complete; any unfinished player below will clear it.
+        raceFinish = 1
+
         for play in self.listPlayer:
 
           # Change the car sprite
@@ -485,13 +529,15 @@ class Game:
 
 
           # Test if the player has finished
-          if play.nbLap == self.maxLapNb and play.raceFinish != 1:
+          if play.nbLap >= self.maxLapNb and play.raceFinish != 1:
             play.raceFinish = 1
             play.car.blink = 1
 
+
           # Test is somebody has not finished
-          if play.nbLap != self.maxLapNb:
+          if play.nbLap < self.maxLapNb:
             raceFinish = 0
+
 
           # Blink = 0, no blink
           if play.car.blink == 0:

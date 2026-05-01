@@ -1390,6 +1390,14 @@ class NetworkLobbyMenu(Menu):
     self._host_level = host_level
     self._laps       = laps
 
+    self._track_names = track.getAvailableTrackNames()
+    if self._track_name in self._track_names:
+      self._track_index = self._track_names.index(self._track_name)
+    else:
+      self._track_index = 0
+      if self._track_names:
+        self._track_name = self._track_names[0]
+
     self._players   = [local_name]   # roster; updated by server broadcasts
     self._chat_log  = []
     self._chat_in   = misc.TextInput(48, allow_space=True)
@@ -1406,6 +1414,19 @@ class NetworkLobbyMenu(Menu):
       self._local_ip = "unknown"
 
     SimpleTitleOnlyMenu(misc.titleFont, "Network Lobby")
+
+    if self._is_host:
+      self._broadcast_lobby_state()
+
+  def _broadcast_lobby_state(self):
+    if not self._is_host:
+      return
+    self._net.broadcast({
+      "type": "lobby_state",
+      "track": self._track_name,
+      "reverse": self._track_rev,
+      "laps": self._laps,
+    })
 
   # ------------------------------------------------------------------
   def getInput(self):
@@ -1440,14 +1461,53 @@ class NetworkLobbyMenu(Menu):
       return "refresh"
     if key == K_ESCAPE:
       if self._is_host:
-        self._net.broadcast({"type": "finish"})
+        self._net.broadcast({"type": "lobby_close"})
         self._net.stop()
         return {"action": "close"}
       else:
-        self._net.send({"type": "bye"})
+        self._net.send({
+          "type": "bye",
+          "name": self._local_name,
+          "pid":  getattr(self._net, "player_id", -1),
+        })
         self._net.disconnect()
         return {"action": "leave"}
+    if self._is_host and key == K_LEFT and self._track_names:
+      if self._track_index > 0:
+        self._track_index -= 1
+      else:
+        self._track_index = len(self._track_names) - 1
+      self._track_name = self._track_names[self._track_index]
+      self._broadcast_lobby_state()
+      return "refresh"
+    if self._is_host and key == K_RIGHT and self._track_names:
+      if self._track_index < len(self._track_names) - 1:
+        self._track_index += 1
+      else:
+        self._track_index = 0
+      self._track_name = self._track_names[self._track_index]
+      self._broadcast_lobby_state()
+      return "refresh"
+    if self._is_host and key == K_r:
+      self._track_rev = 1 - self._track_rev
+      self._broadcast_lobby_state()
+      return "refresh"
+    if self._is_host and key == K_UP:
+      if self._laps < 10:
+        self._laps += 1
+      else:
+        self._laps = 1
+      self._broadcast_lobby_state()
+      return "refresh"
+    if self._is_host and key == K_DOWN:
+      if self._laps > 1:
+        self._laps -= 1
+      else:
+        self._laps = 10
+      self._broadcast_lobby_state()
+      return "refresh"
     if key == K_s and self._is_host:
+      roster = self._net.get_player_list()
       # Start race: broadcast start message then return
       self._net.broadcast({
         "type":       "start",
@@ -1457,9 +1517,15 @@ class NetworkLobbyMenu(Menu):
         "host_name":  self._local_name,
         "host_color": self._host_color,
         "host_level": self._host_level,
-        "roster":     self._net.get_player_list(),
+        "roster":     roster,
       })
-      return {"action": "start"}
+      return {
+        "action": "start",
+        "roster": roster,
+        "track": self._track_name,
+        "reverse": self._track_rev,
+        "laps": self._laps,
+      }
     return None
 
   # ------------------------------------------------------------------
@@ -1476,7 +1542,8 @@ class NetworkLobbyMenu(Menu):
         color  = msg.get("color", 1)
         level  = msg.get("level", 1)
         cidx   = msg.get("_client_idx", 0)
-        self._net.register_player(cidx, name, color, level)
+        pid = self._net.register_player(cidx, name, color, level)
+        self._net.send_to(cidx, {"type": "assigned", "pid": pid})
         if name not in self._players:
           self._players.append(name)
         self._chat_log.append("*** " + name + " joined ***")
@@ -1484,11 +1551,34 @@ class NetworkLobbyMenu(Menu):
           "type":   "players",
           "list":   self._players,
           "roster": self._net.get_player_list(),
+          "track": self._track_name,
+          "reverse": self._track_rev,
+          "laps": self._laps,
         })
+        self._broadcast_lobby_state()
+        changed = True
+
+      elif mtype == "assigned" and not self._is_host:
+        pid = msg.get("pid", -1)
+        self._net.player_id = pid
+        self._chat_log.append("*** assigned racer id P" + str(pid) + " ***")
         changed = True
 
       elif mtype == "players" and not self._is_host:
         self._players = msg.get("list", self._players)
+        self._track_name = msg.get("track", self._track_name)
+        self._track_rev = msg.get("reverse", self._track_rev)
+        self._laps = msg.get("laps", self._laps)
+        if self._track_name in self._track_names:
+          self._track_index = self._track_names.index(self._track_name)
+        changed = True
+
+      elif mtype == "lobby_state" and not self._is_host:
+        self._track_name = msg.get("track", self._track_name)
+        self._track_rev = msg.get("reverse", self._track_rev)
+        self._laps = msg.get("laps", self._laps)
+        if self._track_name in self._track_names:
+          self._track_index = self._track_names.index(self._track_name)
         changed = True
 
       elif mtype == "chat":
@@ -1501,13 +1591,20 @@ class NetworkLobbyMenu(Menu):
         changed = True
 
       elif mtype == "bye" and self._is_host:
-        name = msg.get("name", "?")
+        cidx = msg.get("_client_idx", -1)
+        reg  = self._net.get_player(cidx) if cidx >= 0 else None
+        name = msg.get("name", reg["name"] if reg else "?")
         self._players = [p for p in self._players if p != name]
         self._chat_log.append("*** " + name + " left ***")
+        if cidx >= 0:
+          self._net.remove_player(cidx)
         self._net.broadcast({
           "type":   "players",
           "list":   self._players,
           "roster": self._net.get_player_list(),
+          "track": self._track_name,
+          "reverse": self._track_rev,
+          "laps": self._laps,
         })
         changed = True
 
@@ -1523,10 +1620,15 @@ class NetworkLobbyMenu(Menu):
           "roster":     msg.get("roster", []),
         }
 
-      elif mtype == "finish" and not self._is_host:
-        # Host closed the lobby — leave gracefully
+      elif mtype == "lobby_close" and not self._is_host:
+        # Host closed the lobby - leave gracefully.
         self._net.disconnect()
         result = {"action": "leave"}
+
+      elif mtype == "finish" and not self._is_host:
+        # Race-finish packet can still be in socket buffers when returning
+        # to lobby; ignore it here so client may stay for the next race.
+        changed = True
 
     if result:
       return result
@@ -1569,6 +1671,17 @@ class NetworkLobbyMenu(Menu):
 
     y += int(10 * misc.zoom)
 
+    track_text = "Next track: " + self._track_name.capitalize()
+    if self._track_rev == 1:
+      track_text += " REV"
+    ts = misc.itemFont.render(track_text, 1, misc.lightColor)
+    misc.screen.blit(ts, (int(30 * misc.zoom), y))
+    y += ts.get_height() + int(2 * misc.zoom)
+
+    ls = misc.itemFont.render("Laps: " + str(self._laps), 1, misc.lightColor)
+    misc.screen.blit(ls, (int(30 * misc.zoom), y))
+    y += ls.get_height() + int(10 * misc.zoom)
+
     # ── Chat log ─────────────────────────────────────────────────────
     chat_hdr = misc.itemFont.render("Chat:", 1, misc.lightColor)
     misc.screen.blit(chat_hdr, (int(30 * misc.zoom), y))
@@ -1590,7 +1703,7 @@ class NetworkLobbyMenu(Menu):
     # ── Footer instructions ──────────────────────────────────────────
     foot_y = int(misc.screen.get_height() * 0.92)
     if self._is_host:
-      foot = "[S] Start Race   [T] Chat   [ESC] Close Lobby"
+      foot = "[LEFT/RIGHT] Track  [R] Reverse  [UP/DOWN] Laps  [S] Start  [T] Chat  [ESC] Close"
       ip_text = "Your IP: " + self._local_ip
       ip_surf = misc.popUpFont.render(ip_text, 1, misc.darkColor, (0, 0, 0))
       misc.screen.blit(ip_surf, (int(30 * misc.zoom), foot_y - ip_surf.get_height() - 4))
