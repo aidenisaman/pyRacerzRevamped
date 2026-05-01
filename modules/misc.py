@@ -175,27 +175,74 @@ def wait4Key():
   # Clear event queue
   pygame.event.clear()  
 
-def startRandomMusic():
+def startMenuMusic():
   global music
 
   stopMusic()
 
-  if music == 1:
-    # Randomly choose the Music among .ogg files
-    musics = []
-    listFiles = os.listdir("musics")
-    for fileMusic in listFiles:
-      if fileMusic.endswith(".ogg") or fileMusic.endswith(".OGG"):
-        musics.append(fileMusic)
+  if music != 1:
+    return
 
-    if len(musics) > 0:
-      rand = random.randint(0, len(musics)-1)
-      try:
-        pygame.mixer.music.load(os.path.join("musics", musics[rand]))
-        pygame.mixer.music.play()
-      except Exception as e:
-        print("Music: %s unable to play..." % musics[rand]) 
-        print(e)
+  try:
+    music_file = os.path.join("musics", "menu_music.mp3")
+    pygame.mixer.music.load(music_file)
+    pygame.mixer.music.set_volume(0.35)
+    pygame.mixer.music.play(-1)
+  except Exception as e:
+    print("Menu music unable to play...")
+    print(e)
+
+
+def startRaceMusic(track_name=None):
+  global music
+
+  stopMusic()
+
+  if music != 1:
+    return
+
+  try:
+    track_music = {
+      "beach": "track_music_2.mp3",
+      "wave": "track_music_1.mp3",
+
+      "city": "track_music_3.mp3",
+      "forest": "track_music_2.mp3",
+
+      "desert": "track_music_1.mp3",
+      "mountain": "track_music_3.mp3",
+
+      "formula": "track_music_4.mp3",
+      "nascar": "track_music_4.mp3",
+    }
+
+    filename = track_music.get(track_name, "track_music_1.mp3")
+    music_file = os.path.join("musics", filename)
+
+    pygame.mixer.music.load(music_file)
+    pygame.mixer.music.set_volume(0.55)
+    pygame.mixer.music.play(-1)
+  except Exception as e:
+    print("Race music unable to play for track:", track_name)
+    print(e)
+
+
+def startResultMusic():
+  global music
+
+  stopMusic()
+
+  if music != 1:
+    return
+
+  try:
+    music_file = os.path.join("musics", "result_music.mp3")
+    pygame.mixer.music.load(music_file)
+    pygame.mixer.music.set_volume(0.45)
+    pygame.mixer.music.play(-1)
+  except Exception as e:
+    print("Result music unable to play...")
+    print(e)
 
 def stopMusic():
   pygame.mixer.music.fadeout(1000)

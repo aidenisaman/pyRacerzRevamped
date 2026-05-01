@@ -896,7 +896,7 @@ class ChooseHumanPlayerMenu(Menu):
           self.keyRight = None
           awaiting_key[0] = "right"
           return "refresh"
-        if self.select == 8:
+        if self.select == 1:
           return player.HumanPlayer(self.pseudo, int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level, self.keyAccel, self.keyBrake, self.keyLeft, self.keyRight)
       if self.select == 2 and self._pseudo_input.feed_key(key):
         self.pseudo = self._pseudo_input.text
@@ -925,6 +925,20 @@ class ChooseHumanPlayerMenu(Menu):
 
       y = title_rect.bottom + int(30 * misc.zoom)
       i = 1
+
+      # 1. Go
+      if i == self.select:
+          text = self.itemFont.render("GO", True, misc.lightColor)
+      else:
+          text = self.itemFont.render("GO", True, misc.darkColor)
+
+      text_rect = text.get_rect()
+      text_rect.centerx = center_x
+      text_rect.y = y
+      misc.screen.blit(text, text_rect)
+
+      y = y + text_rect.height + self.gap
+      i += 1
 
       # 1. Car selection
       if i == self.select:
@@ -1041,17 +1055,6 @@ class ChooseHumanPlayerMenu(Menu):
       y = y + text_rect.height + self.gap
       i += 1
 
-      # 8. Go
-      if i == self.select:
-          text = self.itemFont.render("GO", True, misc.lightColor)
-      else:
-          text = self.itemFont.render("GO", True, misc.darkColor)
-
-      text_rect = text.get_rect()
-      text_rect.centerx = center_x
-      text_rect.y = y
-      misc.screen.blit(text, text_rect)
-
       pygame.display.flip()
 
 
@@ -1099,119 +1102,116 @@ class ChooseRobotPlayerMenu(Menu):
     self.level = 1
 
   def getInput(self):
-  
+
     def handle_key(key):
       if key == K_ESCAPE:
         return -1
+
       if key == K_UP:
         if self.select != 1:
           self.select = self.select - 1
         else:
           self.select = 3
         return "refresh"
+
       if key == K_DOWN:
         if self.select != 3:
           self.select = self.select + 1
         else:
           self.select = 1
         return "refresh"
+
       if key == K_LEFT:
-        if self.select == 1:
+        # 2 = Car selection
+        if self.select == 2:
           if self.carColor != 1:
             self.carColor = self.carColor - 1
           else:
             self.carColor = len(self.listCars)
-        if self.select == 2:
+
+        # 3 = Level selection
+        if self.select == 3:
           if self.level != 1:
             self.level = self.level - 1
           else:
             self.level = 3
+
         return "refresh"
+
       if key == K_RIGHT:
-        if self.select == 1:
+        # 2 = Car selection
+        if self.select == 2:
           if self.carColor != len(self.listCars):
             self.carColor = self.carColor + 1
           else:
             self.carColor = 1
-        if self.select == 2:
+
+        # 3 = Level selection
+        if self.select == 3:
           if self.level != 3:
             self.level = self.level + 1
           else:
             self.level = 1
+
         return "refresh"
-      if key == K_RETURN and self.select == 3:
-        return player.RobotPlayer(int(self.listAvailableCarNames[self.carColor-1].replace("car", "")), self.level)
+
+      # 1 = GO
+      if key == K_RETURN and self.select == 1:
+        return player.RobotPlayer(
+          int(self.listAvailableCarNames[self.carColor - 1].replace("car", "")),
+          self.level
+        )
+
       return None
 
     return _menu_loop(self.refresh, handle_key)
 
 
   def refresh(self):
-      misc.screen.blit(self.background, (0, 0))
 
-      overlay = pygame.Surface(misc.screen.get_size())
-      overlay.set_alpha(80)
-      overlay.fill((0, 0, 0))
-      misc.screen.blit(overlay, (0, 0))
+    misc.screen.blit(self.background, (0, 0))
+    titleMenu = SimpleTitleOnlyMenu(self.titleFont, self.title)
 
-      center_x = _screen_rect().centerx
+    y = self.startY
+    i = 1
+    center_x = _screen_rect().centerx
 
-      # title
-      title_text = self.titleFont.render(self.title, True, misc.lightColor)
-      title_rect = title_text.get_rect()
-      title_rect.centerx = center_x
-      title_rect.y = 20
-      misc.screen.blit(title_text, title_rect)
+    # 1 = GO
+    color = misc.lightColor if self.select == 1 else misc.darkColor
+    text = self.itemFont.render("GO", True, color)
+    rect = text.get_rect()
+    rect.centerx = center_x
+    rect.y = y
+    misc.screen.blit(text, rect)
 
-      y = title_rect.bottom + int(30 * misc.zoom)
-      i = 1
+    y += rect.height + self.gap
+    i += 1
 
-      # 1. Car selection
-      if i == self.select:
-          text = self.itemFont.render("<     >", True, misc.lightColor)
-      else:
-          text = self.itemFont.render("<     >", True, misc.darkColor)
+    # 2 = Car
+    color = misc.lightColor if self.select == 2 else misc.darkColor
+    text = self.itemFont.render("<     >", True, color)
+    rect = text.get_rect()
+    rect.centerx = center_x
+    rect.y = y
+    misc.screen.blit(text, rect)
 
-      text_rect = text.get_rect()
-      text_rect.centerx = center_x
-      text_rect.y = y
-      misc.screen.blit(text, text_rect)
+    carRect = self.listCars[self.carColor - 1].get_rect()
+    carRect.centerx = center_x
+    carRect.y = y + (rect.height - carRect.height) / 2
+    misc.screen.blit(self.listCars[self.carColor - 1], carRect)
 
-      car_rect = self.listCars[self.carColor - 1].get_rect()
-      car_rect.centerx = center_x
-      car_rect.y = y + (text_rect.height - car_rect.height) / 2
-      misc.screen.blit(self.listCars[self.carColor - 1], car_rect)
+    y += rect.height + self.gap
+    i += 1
 
-      y = y + max(text_rect.height, car_rect.height) + self.gap
-      i += 1
+    # 3 = Level
+    color = misc.lightColor if self.select == 3 else misc.darkColor
+    text = self.itemFont.render("< Level " + str(self.level) + " >", True, color)
+    rect = text.get_rect()
+    rect.centerx = center_x
+    rect.y = y
+    misc.screen.blit(text, rect)
 
-      # 2. Level selection
-      if i == self.select:
-          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.lightColor)
-      else:
-          text = self.itemFont.render("< Level " + str(self.level) + " >", True, misc.darkColor)
-
-      text_rect = text.get_rect()
-      text_rect.centerx = center_x
-      text_rect.y = y
-      misc.screen.blit(text, text_rect)
-
-      y = y + text_rect.height + self.gap
-      i += 1
-
-      # 3. Go
-      if i == self.select:
-          text = self.itemFont.render("GO", True, misc.lightColor)
-      else:
-          text = self.itemFont.render("GO", True, misc.darkColor)
-
-      text_rect = text.get_rect()
-      text_rect.centerx = center_x
-      text_rect.y = y
-      misc.screen.blit(text, text_rect)
-
-      pygame.display.flip()
-
+    pygame.display.flip()
 # ===========================================================================
 # Network multiplayer menus
 # ===========================================================================

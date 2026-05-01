@@ -285,12 +285,22 @@ class Game:
             misc.stopMusic()
             sys.exit(0)
           elif event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-              # Stop music
-              misc.stopMusic()
-              return -1
-            for play in self.listPlayer:
-              play.handle_keydown(event.key)
+
+              if event.key == K_ESCAPE:
+                  misc.stopMusic()
+                  return -1
+
+              # Toggle music during race
+              if event.key == K_m:
+                  if misc.music == 1:
+                      misc.music = 0
+                      misc.stopMusic()
+                  else:
+                      misc.music = 1
+                      misc.startRaceMusic(currentTrack.name)
+
+              for play in self.listPlayer:
+                  play.handle_keydown(event.key)
           elif event.type == KEYUP:
             for play in self.listPlayer:
               play.handle_keyup(event.key)
@@ -603,76 +613,9 @@ class Game:
       popUp.display()
       l.append(popUp.rect.__copy__())
       
-      # Display celebration screen showing player positions
-      misc.screen.blit(currentTrack.track, (0, 0))
-      
-      # Create a semi-transparent background for results
-      background_surface = pygame.Surface((int(400*misc.zoom), int(500*misc.zoom)))
-      background_surface.fill((30, 30, 60))  # Dark blue background
-      background_surface.set_alpha(200)  # Semi-transparent
-      background_rect = background_surface.get_rect()
-      background_rect.centerx = misc.screen.get_rect().centerx
-      background_rect.y = int(40*misc.zoom)
-      misc.screen.blit(background_surface, background_rect)
-      
-      # Title - Race Results
-      titleText = misc.titleFont.render("RACE RESULTS", 1, misc.lightColor)
-      titleRect = titleText.get_rect()
-      titleRect.centerx = misc.screen.get_rect().centerx
-      titleRect.y = int(60*misc.zoom)
-      misc.screen.blit(titleText, titleRect)
-      
-      # Display player positions
-      y_pos = int(160*misc.zoom)
-      for play in sorted(self.listPlayer, key=lambda p: p.rank):
-        # Get position ordinal (1st, 2nd, 3rd, etc.)
-        pos = play.rank
-        if pos == 1:
-          position_text = "1st"
-          position_color = (255, 215, 0)  # Gold
-        elif pos == 2:
-          position_text = "2nd"
-          position_color = (192, 192, 192)  # Silver
-        elif pos == 3:
-          position_text = "3rd"
-          position_color = (205, 127, 50)  # Bronze
-        else:
-          position_text = str(pos) + "th"
-          position_color = misc.lightColor
-        
-        # Display position and player name
-        result_text = misc.popUpFont.render(position_text + " Place: " + play.name, 1, position_color)
-        resultRect = result_text.get_rect()
-        resultRect.centerx = misc.screen.get_rect().centerx
-        resultRect.y = y_pos
-        misc.screen.blit(result_text, resultRect)
-        y_pos = y_pos + int(60*misc.zoom)
-      
-      # Display "press any key to continue" at the bottom
-      continue_text = misc.itemFont.render("Press ENTER to continue", 1, misc.lightColor)
-      continueRect = continue_text.get_rect()
-      continueRect.centerx = misc.screen.get_rect().centerx
-      continueRect.y = int(630*misc.zoom)
-      misc.screen.blit(continue_text, continueRect)
-      
-      pygame.display.flip()
-      pygame.time.delay(3000)  # Show results for 3 seconds
-      
-      # Wait for ENTER key only
-      pygame.event.clear()
-      waiting = True
-      while waiting:
-        for event in pygame.event.get():
-          if event.type == QUIT:
-            misc.stopMusic()
-            sys.exit(0)
-          if event.type == KEYDOWN:
-            if event.key == K_RETURN:
-              waiting = False
-              break
-        pygame.time.delay(10)
+      misc.startResultMusic()
+      self.computeScores(currentTrack)
 
-      
       menu1 = menu.SimpleMenu(misc.titleFont, "save Replay?", 20*misc.zoom, misc.itemFont, ["No", "Yes"])
       select1 = menu1.getInput()
 
@@ -698,10 +641,10 @@ class Game:
             # player per frame), then zlib-compress for compact storage.
             f.write(zlib.compress(replayArray.tobytes()))
 
-      self.computeScores(currentTrack)
+      
 
-      # Stop music
-      misc.stopMusic()
+      # Return to menu music
+      misc.startMenuMusic()
 
     if self.gameType == "tournament":
       self.displayFinalScores()
@@ -710,74 +653,188 @@ class Game:
     if self.gameType == "challenge":
       return self.listPlayer[0].bestChrono
 
-
   def computeScores(self, track):
 
-    titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "raceResult")
+      misc.screen.blit(misc.background, (0, 0))
 
-    y = titleMenu.startY
-    for play in self.listPlayer:
+      overlay = pygame.Surface(misc.screen.get_size())
+      overlay.set_alpha(100)
+      overlay.fill((0, 0, 0))
+      misc.screen.blit(overlay, (0, 0))
 
-      # If it's a tournament, compute points
-      if self.gameType == "tournament":
-        # Give points
-        if play.rank == 1:
-          morePoint = 10
-        elif play.rank == 2:
-          morePoint = 6
-        elif play.rank == 3:
-          morePoint = 4
-        elif play.rank == 4:
-          morePoint = 3
-        elif play.rank == 5:
-          morePoint = 2
-        elif play.rank == 6:
-          morePoint = 1
-        else:
-          morePoint = 0
+      screen_rect = misc.screen.get_rect()
+      center_x = screen_rect.centerx
 
-      # Test if the current player has the best chrono
-      bestChrono = 1
-      for play2 in self.listPlayer:
-        if play.bestChrono > play2.bestChrono:
-          bestChrono = 0
-          break
+            # Main results board
+      board_width = int(760 * misc.zoom)
 
-      playCar = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "cars", "car" + str(play.car.color) + ".png")).convert_alpha(), 270, 1.2*misc.zoom)
+      player_count = len(self.listPlayer)
+      row_height = int(82 * misc.zoom)
+      row_gap = int(10 * misc.zoom)
 
-      # Default text for non-tournament modes
-      text = None
+      board_height = int(170 * misc.zoom) + player_count * (row_height + row_gap)
+      max_board_height = int(650 * misc.zoom)
 
-      # If it's a tournament, compute points
-      if self.gameType == "tournament":
-        if bestChrono == 1:
-          if misc.addHiScore(track, play) == 1:
-            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " + 2 = " + str(play.point+morePoint+2) + "  >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
+      if board_height > max_board_height:
+        board_height = max_board_height
+        row_height = int(70 * misc.zoom)
+        row_gap = int(6 * misc.zoom)
+      board_rect = pygame.Rect(0, 0, board_width, board_height)
+      board_rect.centerx = center_x
+      board_rect.y = int(70 * misc.zoom)
+
+      board_surface = pygame.Surface((board_width, board_height))
+      board_surface.fill((28, 32, 48))
+      board_surface.set_alpha(235)
+      misc.screen.blit(board_surface, board_rect)
+      pygame.draw.rect(misc.screen, (220, 220, 230), board_rect, 3)
+
+      # Title
+      title_text = misc.titleFont.render("RACE RESULTS", True, misc.lightColor)
+      title_rect = title_text.get_rect()
+      title_rect.centerx = center_x
+      title_rect.y = board_rect.y + int(18 * misc.zoom)
+      misc.screen.blit(title_text, title_rect)
+
+      # Header line
+      pygame.draw.line(
+          misc.screen,
+          (180, 180, 190),
+          (board_rect.x + int(30 * misc.zoom), title_rect.bottom + int(10 * misc.zoom)),
+          (board_rect.right - int(30 * misc.zoom), title_rect.bottom + int(10 * misc.zoom)),
+          2
+      )
+
+      # Sort players by rank
+      sorted_players = sorted(self.listPlayer, key=lambda p: p.rank)
+
+      row_y = title_rect.bottom + int(28 * misc.zoom)
+
+      for idx, play in enumerate(sorted_players):
+          # Row background
+          row_rect = pygame.Rect(
+              board_rect.x + int(25 * misc.zoom),
+              row_y,
+              board_width - int(50 * misc.zoom),
+              row_height
+          )
+
+          if play.rank == 1:
+              row_fill = (70, 60, 25)   # gold-ish
+              border_color = (255, 215, 0)
+          elif play.rank == 2:
+              row_fill = (55, 55, 65)   # silver-ish
+              border_color = (192, 192, 192)
+          elif play.rank == 3:
+              row_fill = (70, 50, 35)   # bronze-ish
+              border_color = (205, 127, 50)
           else:
-            text = misc.titleFont.render(str(play.rank) + "' " + play.name + " :  " + str(play.point) + " + " + str(morePoint) + " + 2 = " + str(play.point+morePoint+2) + "  >> " + misc.chrono2Str(play.bestChrono) + " <<", 1, misc.lightColor)
-          play.point = play.point + morePoint + 2
+              row_fill = (45, 48, 62)
+              border_color = (120, 120, 140)
+
+          pygame.draw.rect(misc.screen, row_fill, row_rect)
+          pygame.draw.rect(misc.screen, border_color, row_rect, 2)
+
+          # Position text
+          if play.rank == 1:
+              pos_text = "1st"
+              pos_color = (255, 215, 0)
+          elif play.rank == 2:
+              pos_text = "2nd"
+              pos_color = (192, 192, 192)
+          elif play.rank == 3:
+              pos_text = "3rd"
+              pos_color = (205, 127, 50)
+          else:
+              pos_text = str(play.rank) + "th"
+              pos_color = misc.lightColor
+
+          pos_surface = misc.itemFont.render(pos_text, True, pos_color)
+          pos_rect = pos_surface.get_rect()
+          pos_rect.x = row_rect.x + int(18 * misc.zoom)
+          pos_rect.centery = row_rect.centery
+          misc.screen.blit(pos_surface, pos_rect)
+
+          # Car image
+          playCar = pygame.transform.rotozoom(
+              pygame.image.load(
+                  os.path.join("sprites", "cars", "car" + str(play.car.color) + ".png")
+              ).convert_alpha(),
+              270,
+              1.0 * misc.zoom
+          )
+
+          playCarRect = playCar.get_rect()
+          playCarRect.x = pos_rect.right + int(25 * misc.zoom)
+          playCarRect.centery = row_rect.y + int(row_height / 2)
+          misc.screen.blit(playCar, playCarRect)
+
+          # Player name
+          text_x = playCarRect.right + int(20 * misc.zoom)
+
+          name_surface = misc.itemFont.render(play.name, True, misc.lightColor)
+          name_rect = name_surface.get_rect()
+          name_rect.x = text_x
+          name_rect.y = row_rect.y + int(5 * misc.zoom)
+          misc.screen.blit(name_surface, name_rect)
+
+          # Time / score text
+          if self.gameType == "tournament":
+              info_text = "Points: " + str(play.point)
+          else:
+              info_text = "Best Time: " + misc.chrono2Str(play.bestChrono)
+
+          bestChrono = 1
+          for play2 in self.listPlayer:
+              if play.bestChrono > play2.bestChrono:
+                  bestChrono = 0
+                  break
+
+          if self.gameType != "tournament" and bestChrono == 1:
+              if misc.addHiScore(track, play) == 1:
+                  info_text += "   |   HiScore!"
+
+          info_color = misc.lightColor if play.rank == 1 else (210, 210, 210)
+          info_surface = misc.smallItemFont.render(info_text, True, info_color)
+          info_rect = info_surface.get_rect()
+          info_rect.x = text_x
+          info_rect.y = row_rect.y + int(42 * misc.zoom)
+          misc.screen.blit(info_surface, info_rect)
+
+          row_y += row_height + int(12 * misc.zoom)
+
+      # Footer hint
+      hint_surface = misc.smallItemFont.render("Press ENTER to continue", True, misc.lightColor)
+      hint_rect = hint_surface.get_rect()
+      hint_rect.centerx = misc.screen.get_rect().centerx
+      hint_rect.y = min(board_rect.bottom + int(14 * misc.zoom), int(725 * misc.zoom))
+      misc.screen.blit(hint_surface, hint_rect)
+
+      pygame.display.flip()
+
+      # Clear old events first
+      pygame.event.clear()
+
+      # Wait until all currently held keys are released
+      waiting_release = True
+      while waiting_release:
+        pressed = pygame.key.get_pressed()
+        if not any(pressed):
+          waiting_release = False
+        pygame.time.delay(10)
+
+      # Now wait only for ENTER
+      waiting_enter = True
+      while waiting_enter:
+        for event in pygame.event.get():
+          if event.type == QUIT:
+            misc.stopMusic()
+            sys.exit(0)
+          if event.type == KEYDOWN and event.key == K_RETURN:
+            waiting_enter = False
+            break
+        pygame.time.delay(10)
       
-      # For single-race modes (non-tournament), display rank and chrono
-      if text is None:
-        if bestChrono == 1:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : >> " + misc.chrono2Str(play.bestChrono) + " << HiScore !", 1, misc.lightColor)
-        else:
-          text = misc.titleFont.render(str(play.rank) + "' " + play.name + " : " + misc.chrono2Str(play.bestChrono), 1, misc.darkColor)
-
-      # Display the car with statistics
-      playCarRect = playCar.get_rect()
-      textRect = text.get_rect()
-      textRect.centerx = misc.screen.get_rect().centerx + (playCarRect.width + 20*misc.zoom) /2
-      textRect.y = y + 80*misc.zoom*play.rank
-      playCarRect.x = textRect.x - (playCarRect.width + 20*misc.zoom)
-      playCarRect.centery = textRect.centery
-      misc.screen.blit(playCar, playCarRect)
-      misc.screen.blit(text, textRect)
-
-    pygame.display.flip()
-    
-    misc.wait4Key()
-
   def displayFinalScores(self):
 
     titleMenu = menu.SimpleTitleOnlyMenu(misc.titleFont, "finalResult")
@@ -809,5 +866,23 @@ class Game:
       misc.screen.blit(text, textRect)
 
     pygame.display.flip()
-    
-    misc.wait4Key()
+
+    pygame.event.clear()
+
+    waiting_release = True
+    while waiting_release:
+      pressed = pygame.key.get_pressed()
+      if not any(pressed):
+        waiting_release = False
+      pygame.time.delay(10)
+
+    waiting_enter = True
+    while waiting_enter:
+      for event in pygame.event.get():
+        if event.type == QUIT:
+          misc.stopMusic()
+          sys.exit(0)
+        if event.type == KEYDOWN and event.key == K_RETURN:
+          waiting_enter = False
+          break
+      pygame.time.delay(10)
