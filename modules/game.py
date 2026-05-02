@@ -160,94 +160,80 @@ class Game:
       for r in range(1, self.maxLapNb+1):
         bestRank.append(1)
 
-      # Display Lights (Red, Orange, Green - like traffic light)
-      imgFireG = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireG, (10*misc.zoom,10*misc.zoom))
-      misc.screen.blit(imgFireG, (90*misc.zoom,10*misc.zoom))
-      misc.screen.blit(imgFireG, (170*misc.zoom,10*misc.zoom))
-      pygame.display.flip()
-      pygame.time.delay(1000)
+            # ── countdown lights + cars visible ───────────────────────────────
+      img_grey = pygame.transform.rotozoom(
+        pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
+      img_red = pygame.transform.rotozoom(
+        pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+      img_orange = pygame.transform.rotozoom(
+        pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
+      img_green = pygame.transform.rotozoom(
+        pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
 
-      # Prepare countdown font
-      countdownFont = pygame.font.Font(None, int(150*misc.zoom))
+      countdownFont = pygame.font.Font(None, int(150 * misc.zoom))
 
-      # Try to load countdown sound: prefer project `sounds/`, else copy from Downloads, else fall back to bundled countdowns
-      # Load countdown sound only from project files
+      def draw_countdown_frame(number, active_img, active_x):
+        misc.screen.blit(currentTrack.track, (0, 0))
+
+        # draw all cars before lights/text
+        for play in self.listPlayer:
+          play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+          play.car.sprite.draw(misc.screen)
+
+        # draw lights
+        misc.screen.blit(img_grey, (int(10 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(active_img, (int(active_x * misc.zoom), int(10 * misc.zoom)))
+
+        # draw number
+        countdown_text = countdownFont.render(number, True, misc.lightColor)
+        countdown_rect = countdown_text.get_rect()
+        countdown_rect.center = misc.screen.get_rect().center
+        misc.screen.blit(countdown_text, countdown_rect)
+
+        pygame.display.flip()
+
       countdown_sound = None
-      countdown_channel = None
-
       for candidate in (
-          "mixkit-melodic-race-countdown-1955.wav",
-          "countdown_go.wav",
-          "race_start.wav",
-          "countdown_3.wav",
-          "countdown_2.wav",
-          "countdown_1.wav",
+        "mixkit-melodic-race-countdown-1955.wav",
+        "countdown_go.wav",
+        "race_start.wav",
+        "countdown_3.wav",
+        "countdown_2.wav",
+        "countdown_1.wav",
       ):
-          cand_path = os.path.join("sounds", candidate)
-          if os.path.exists(cand_path):
-              try:
-                  countdown_sound = pygame.mixer.Sound(cand_path)
-                  break
-              except Exception:
-                  countdown_sound = None
+        cand_path = os.path.join("sounds", candidate)
+        if os.path.exists(cand_path):
+          try:
+            countdown_sound = pygame.mixer.Sound(cand_path)
+            break
+          except Exception:
+            countdown_sound = None
 
-      # Show RED light (first signal) with countdown "3"
-      imgFireRed = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireRed, (10*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("3", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      # Restore only the countdown area from track to preserve lights/background
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
       if countdown_sound:
         try:
-          # Extend final beep by +1s so it's still audible when race starts
-          countdown_channel = countdown_sound.play(maxtime=2500)
+          countdown_sound.play(maxtime=2500)
         except Exception:
-          countdown_channel = None
-      pygame.display.flip()
+          pass
+
+      draw_countdown_frame("3", img_red, 10)
       pygame.time.delay(1000)
 
-      # Show ORANGE light (second signal) with countdown "2"
-      imgFireOrange = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireOrange, (90*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("2", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
-      if countdown_sound:
-        try:
-          countdown_channel = countdown_sound.play(maxtime=1500)
-        except Exception:
-          countdown_channel = None
-      pygame.display.flip()
+      draw_countdown_frame("2", img_orange, 90)
       pygame.time.delay(1000)
 
-      # Show GREEN light (third signal - GO!) with countdown "1"
-      imgFireGreen = pygame.transform.rotozoom(pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
-      misc.screen.blit(imgFireGreen, (170*misc.zoom,10*misc.zoom))
-      countdown_text = countdownFont.render("1", 1, misc.lightColor)
-      countdown_rect = countdown_text.get_rect()
-      countdown_rect.center = (misc.screen.get_rect().centerx, misc.screen.get_rect().centery)
-      misc.screen.blit(currentTrack.track, countdown_rect, countdown_rect)
-      misc.screen.blit(countdown_text, countdown_rect)
-      # Play countdown sound if available (limit length)
-      if countdown_sound:
-        try:
-          countdown_channel = countdown_sound.play(maxtime=1500)
-        except Exception:
-          countdown_channel = None
-      pygame.display.flip()
-      pygame.time.delay(990)
+      draw_countdown_frame("1", img_green, 170)
+      pygame.time.delay(1000)
 
-      # Clear event queue
-      # Let the countdown sound finish naturally (do not force-stop here)
       pygame.event.clear()
+      misc.screen.blit(currentTrack.track, (0, 0))
+
+      for play in self.listPlayer:
+        play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+        play.car.sprite.draw(misc.screen)
+
+      pygame.display.flip()
 
       # Display the track
       misc.screen.blit(currentTrack.track, (0, 0))

@@ -16,6 +16,19 @@
 # along with pyRacerz; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+
+# ------------------------------------------------------------
+# Audio Credits
+# ------------------------------------------------------------
+# Some sound effects and music used in this project are sourced from:
+#
+# Pixabay: https://pixabay.com/
+# Freesound: https://freesound.org/
+# Mixkit: https://mixkit.co/
+#
+# All assets are used under their respective licenses.
+# ------------------------------------------------------------
+
 from hashlib import sha1
 import pygame
 from pygame.locals import *
@@ -192,6 +205,95 @@ def startMenuMusic():
     print("Menu music unable to play...")
     print(e)
 
+def showRaceCountdown(currentTrack, players=None):
+  def draw_players():
+    if players is None:
+      return
+
+    for play in players:
+      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+      play.car.sprite.draw(screen)
+
+  # Display Lights: grey placeholders
+  imgFireG = pygame.transform.rotozoom(
+    pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(),
+    0,
+    zoom
+  )
+
+  screen.blit(currentTrack.track, (0, 0))
+  screen.blit(imgFireG, (10 * zoom, 10 * zoom))
+  screen.blit(imgFireG, (90 * zoom, 10 * zoom))
+  screen.blit(imgFireG, (170 * zoom, 10 * zoom))
+  pygame.display.flip()
+  pygame.time.delay(1000)
+
+  countdownFont = pygame.font.Font(None, int(150 * zoom))
+
+  countdown_sound = None
+  for candidate in (
+      "mixkit-melodic-race-countdown-1955.wav",
+      "countdown_go.wav",
+      "race_start.wav",
+      "countdown_3.wav",
+      "countdown_2.wav",
+      "countdown_1.wav",
+  ):
+    cand_path = os.path.join("sounds", candidate)
+    if os.path.exists(cand_path):
+      try:
+        countdown_sound = pygame.mixer.Sound(cand_path)
+        break
+      except Exception:
+        countdown_sound = None
+
+  steps = [
+    ("red.png", 10, "3"),
+    ("orange.png", 90, "2"),
+    ("green.png", 170, "1"),
+  ]
+
+  for image_name, light_x, number in steps:
+    img = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", image_name)).convert_alpha(),
+      0,
+      zoom
+    )
+
+    screen.blit(img, (light_x * zoom, 10 * zoom))
+
+    countdown_text = countdownFont.render(number, 1, lightColor)
+    countdown_rect = countdown_text.get_rect()
+    countdown_rect.center = screen.get_rect().center
+
+    screen.blit(currentTrack.track, countdown_rect, countdown_rect)
+
+    # redraw lights after restoring countdown area
+    screen.blit(imgFireG, (10 * zoom, 10 * zoom))
+    screen.blit(imgFireG, (90 * zoom, 10 * zoom))
+    screen.blit(imgFireG, (170 * zoom, 10 * zoom))
+    screen.blit(img, (light_x * zoom, 10 * zoom))
+
+    screen.blit(countdown_text, countdown_rect)
+
+    if countdown_sound:
+      try:
+        countdown_sound.play(maxtime=1500)
+      except Exception:
+        pass
+
+    pygame.display.flip()
+    pygame.time.delay(1000)
+
+  pygame.event.clear()
+
+  def draw_players():
+    if players is None:
+      return
+
+    for play in players:
+      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+      play.car.sprite.draw(screen)
 
 def startRaceMusic(track_name=None):
   global music

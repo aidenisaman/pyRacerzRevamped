@@ -1,0 +1,14 @@
+PyRacerz Revamped – Audio Credits
+
+This project uses sound effects and music from the following sources:
+
+1. Pixabay
+   https://pixabay.com/
+
+2. Freesound
+   https://freesound.org/
+
+3. Mixkit
+   https://mixkit.co/
+
+All audio assets are used under their respective licenses.

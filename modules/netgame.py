@@ -282,8 +282,91 @@ class NetworkHostRace:
     popUp    = misc.PopUp(ct)
     collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
-    _run_start_sequence(ct, play)
-    self.server.broadcast({"type": "go"})
+    # ── car name blink (same as single race) ────────────────────────
+    for _ in range(4):
+      misc.screen.blit(ct.track, (0, 0))
+      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+      play.car.sprite.draw(misc.screen)
+      name_surf = misc.popUpFont.render(play.name, 1, misc.lightColor, (0, 0, 0))
+      nr = name_surf.get_rect()
+      nr.centerx = int(play.car.x)
+      nr.centery  = int(play.car.y)
+      misc.screen.blit(name_surf, nr)
+      pygame.display.flip()
+      pygame.time.delay(400)
+
+    # ── countdown lights + sound ────────────────────────────────────
+    # ── countdown lights + car visible ───────────────────────────────
+    img_grey = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
+    img_red = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+    img_orange = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
+    img_green = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
+
+    countdownFont = pygame.font.Font(None, int(150 * misc.zoom))
+
+    def draw_countdown_frame(number, active_img, active_x):
+      misc.screen.blit(ct.track, (0, 0))
+
+      # draw host car before lights/text
+      play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+      play.car.sprite.draw(misc.screen)
+
+      # draw lights
+      misc.screen.blit(img_grey, (int(10 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(active_img, (int(active_x * misc.zoom), int(10 * misc.zoom)))
+
+      # draw number
+      countdown_text = countdownFont.render(number, True, misc.lightColor)
+      countdown_rect = countdown_text.get_rect()
+      countdown_rect.center = misc.screen.get_rect().center
+      misc.screen.blit(countdown_text, countdown_rect)
+
+      pygame.display.flip()
+
+    # countdown sound
+    countdown_sound = None
+    for candidate in (
+      "mixkit-melodic-race-countdown-1955.wav",
+      "countdown_go.wav",
+      "race_start.wav",
+      "countdown_3.wav",
+      "countdown_2.wav",
+      "countdown_1.wav",
+    ):
+      cand_path = os.path.join("sounds", candidate)
+      if os.path.exists(cand_path):
+        try:
+          countdown_sound = pygame.mixer.Sound(cand_path)
+          break
+        except Exception:
+          countdown_sound = None
+
+    if countdown_sound:
+      try:
+        countdown_sound.play(maxtime=2500)
+      except Exception:
+        pass
+
+    draw_countdown_frame("3", img_red, 10)
+    pygame.time.delay(1000)
+
+    draw_countdown_frame("2", img_orange, 90)
+    pygame.time.delay(1000)
+
+    draw_countdown_frame("1", img_green, 170)
+    pygame.time.delay(1000)
+
+    pygame.event.clear()
+    misc.screen.blit(ct.track, (0, 0))
+    play.car.image = play.car.cars[int((256.0 * play.car.angle / 2.0 / math.pi) % 256)]
+    play.car.sprite.draw(misc.screen)
+    pygame.display.flip()
 
     # ── main race loop ───────────────────────────────────────────────
     running = True
@@ -299,13 +382,19 @@ class NetworkHostRace:
           break
         elif event.type == KEYDOWN:
           if event.key == K_ESCAPE:
-            self.server.broadcast({"type": "finish", "standings": []})
-            aborted = True
-            running = False
-            break
+            self.server.broadcast({"type": "finish"})
+            misc.stopMusic()
+            return
+
+          if event.key == K_m:
+            if misc.music == 1:
+              misc.music = 0
+              misc.stopMusic()
+            else:
+              misc.music = 1
+              misc.startRaceMusic(ct.name)
+
           play.handle_keydown(event.key)
-        elif event.type == KEYUP:
-          play.handle_keyup(event.key)
 
       if not running:
         break
@@ -550,6 +639,10 @@ class NetworkWatchRace:
     chat_log   = []
     chat_input = misc.TextInput(50, allow_space=True)
     is_typing  = False
+
+    # ── countdown + race music ───────────────────────────────
+    misc.startRaceMusic(ct.name)
+    misc.showRaceCountdown(ct, [play])
 
     misc.screen.blit(ct.track, (0, 0))
     hint_surf = misc.popUpFont.render("[T] Chat   [ESC] Leave", 1, misc.darkColor, (0, 0, 0))
