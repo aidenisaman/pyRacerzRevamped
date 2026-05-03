@@ -382,8 +382,10 @@ def main():
             selected_track_name = result.get("track", selected_track_name)
             selected_track_rev = result.get("reverse", selected_track_rev)
             selected_laps = result.get("laps", selected_laps)
+
             currentTrack = track.Track(selected_track_name, selected_track_rev)
-            #misc.startRandomMusic()
+
+            misc.startRaceMusic(selected_track_name)
             netgame.NetworkHostRace(
               srv,
               thePlayer,
@@ -391,7 +393,9 @@ def main():
               selected_laps,
               remote_player_infos=result.get("roster", []),
             ).run()
-            misc.stopMusic()
+            misc.startResultMusic()
+
+            # Loop back to lobby for another race
             # Loop back to lobby for another race
 
       # ── JOIN ──────────────────────────────────────────────────────
@@ -454,7 +458,7 @@ def main():
                   cli.player_id = info.get("pid", -1)
                   break
 
-            #misc.startRandomMusic()
+            misc.startRaceMusic(result["track"])
             race_result = netgame.NetworkClientRace(
               cli,
               joinPlayer,
@@ -463,9 +467,13 @@ def main():
               remote_player_infos=roster,
               laps=result["laps"],
             ).run()
+
             misc.stopMusic()
+
             if race_result == "leave":
               break
+
+            # Loop back to lobby for another race
             # Loop back to lobby for another race
 
 #import profile

@@ -365,13 +365,19 @@ class NetworkHostRace:
           break
         elif event.type == KEYDOWN:
           if event.key == K_ESCAPE:
-            self.server.broadcast({"type": "finish", "standings": []})
-            aborted = True
-            running = False
-            break
+            self.server.broadcast({"type": "finish"})
+            misc.stopMusic()
+            return
+
+          if event.key == K_m:
+            if misc.music == 1:
+              misc.music = 0
+              misc.stopMusic()
+            else:
+              misc.music = 1
+              misc.startRaceMusic(ct.name)
+
           play.handle_keydown(event.key)
-        elif event.type == KEYUP:
-          play.handle_keyup(event.key)
 
       if not running:
         break
@@ -616,6 +622,10 @@ class NetworkWatchRace:
     chat_log   = []
     chat_input = misc.TextInput(50, allow_space=True)
     is_typing  = False
+
+    # ── countdown + race music ───────────────────────────────
+    misc.startRaceMusic(ct.name)
+    misc.showRaceCountdown(ct, [play])
 
     misc.screen.blit(ct.track, (0, 0))
     hint_surf = misc.popUpFont.render("[T] Chat   [ESC] Leave", 1, misc.darkColor, (0, 0, 0))
