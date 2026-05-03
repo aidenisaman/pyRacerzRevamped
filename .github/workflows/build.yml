@@ -9,41 +9,68 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3-pip python3.11-dev zip
+
+      - name: Install Python packages
+        run: pip3 install -r requirements.txt pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller pyRacerz.spec
+
+      - name: Zip artifact
+        run: cd dist && zip -r ../pyRacerz-Linux-x86_64.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyRacerz-Linux-x86_64
+          path: pyRacerz-Linux-x86_64.zip
+
+      - name: Create Release (Linux)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pyRacerz-Linux-x86_64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-other:
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-latest, windows-latest]
-        python-version: ['3.11']
         include:
-          - os: ubuntu-20.04
-            artifact_name: pyRacerz-Linux-x86_64
           - os: macos-latest
             artifact_name: pyRacerz-macOS-x86_64
           - os: windows-latest
             artifact_name: pyRacerz-Windows-x86_64
       fail-fast: false
-
     runs-on: ${{ matrix.os }}
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Build executable with PyInstaller
-      uses: sayyid5416/pyinstaller@v1
-      with:
-        spec: 'pyRacerz.spec'
-        requirements: 'requirements.txt'
-        python_ver: '3.11'
-        pyinstaller_ver: ''
-        exe_path: './dist'
-        upload_exe_with_name: ${{ matrix.artifact_name }}
-        compression_level: 6
+      - name: Build executable with PyInstaller
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          spec: 'pyRacerz.spec'
+          requirements: 'requirements.txt'
+          python_ver: '3.11'
+          pyinstaller_ver: ''
+          exe_path: './dist'
+          upload_exe_with_name: ${{ matrix.artifact_name }}
+          compression_level: 6
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          ./dist/${{ matrix.artifact_name }}.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./dist/${{ matrix.artifact_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
