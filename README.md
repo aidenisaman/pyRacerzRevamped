@@ -81,56 +81,49 @@ The multiplayer description below is based on `MultiplayerPhase2`, which is the 
 - Menus updated with stronger visual theming and improved track-selection presentation.
 - Font fallback behavior improved for broader machine compatibility.
 
+### Download prebuilt executables from GitHub Releases
 
-### Build and distribute from a fresh GitHub clone (Windows)
+If you don't want to build from source, you can download prebuilt executables for Windows, macOS, and Linux.
 
-If you just downloaded the codebase from GitHub, the installer EXE is **not** in the repo yet. You generate it locally.
+#### 1. Get the release
 
-#### Prerequisites
+1. Go to the [Releases](https://github.com/aidenisaman/pyRacerzRevamped/releases) page on GitHub.
+2. Click on the latest release (or a specific version you want).
+3. Scroll down to **Assets** to see available downloads.
 
-1. Windows 10/11
-2. Python 3.10+ on PATH
-3. Inno Setup 6 installed (for the installer wizard output)
+#### 2. Download and launch for your OS
 
-Inno Setup download: https://jrsoftware.org/isdl.php
+**Windows:**
+- Download `pyRacerz-Windows-x86_64.zip`
+- Extract the zip file to any folder
+- Open the extracted `pyRacerz` folder
+- Double-click `pyRacerz.exe` to launch
 
-#### 1. Clone and open the project
+**macOS:**
+- Download `pyRacerz-macOS-x86_64.zip`
+- Extract the zip file to any folder (or right-click and select "Open")
+- Open the extracted `pyRacerz` folder
+- Double-click `pyRacerz` (or right-click and select "Open" if OS X asks for permission)
+- You may need to grant executable permission: `chmod +x pyRacerz/pyRacerz` in Terminal first
 
-```bash
-git clone <repo-url>
-cd pyRacerzRevamped
-```
+**Linux:**
+- Download `pyRacerz-Linux-x86_64.tar.gz`
+- Extract with: `tar -xzf pyRacerz-Linux-x86_64.tar.gz`
+- Navigate to the folder: `cd pyRacerz`
+- Make the executable: `chmod +x pyRacerz`
+- Run the game: `./pyRacerz`
 
-#### 2. Build the game + installer wizard
-
-Run this from the project root:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build_windows_exe.ps1 -Clean -MakeInstaller
-```
-
-Optional (portable build only, no installer wizard):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build_windows_exe.ps1 -Clean
-```
-
-#### 3. Find the output files
-
-After a successful build, files are created at:
-
-1. Installer wizard EXE: `dist\installer\pyRacerzRevamped-Setup.exe`
-2. Portable game folder: `dist\pyRacerz\`
-3. Portable zip: `dist\pyRacerz-Windows.zip`
+---
 
 
-If you are a player and do not want to build from source:
-
-1. Open the repository page on GitHub.
-2. Click **Releases** on the right side.
-3. Open the latest release.
-4. Under **Assets**, download `pyRacerzRevamped-Setup.exe`.
-5. Run the installer and launch the game from the Start Menu or desktop shortcut.
-
-If the installer asset is not present on a release, use `pyRacerz-Windows.zip` from that same release instead.
-
+# ------------------------------------------------------------
+# Audio Credits
+# ------------------------------------------------------------
+# Some sound effects and music used in this project are sourced from:
+#
+# Pixabay: https://pixabay.com/
+# Freesound: https://freesound.org/
+# Mixkit: https://mixkit.co/
+#
+# All assets are used under their respective licenses.
+# ----------------------------------------------------------
