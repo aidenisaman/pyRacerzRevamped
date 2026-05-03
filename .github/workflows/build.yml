@@ -18,13 +18,19 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3-pip python3.11-dev zip
+          DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common zip curl
+          add-apt-repository ppa:deadsnakes/ppa -y
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.11-dev python3.11-distutils
+
+      - name: Install pip
+        run: curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
       - name: Install Python packages
-        run: pip3 install -r requirements.txt pyinstaller
+        run: python3.11 -m pip install -r requirements.txt pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller pyRacerz.spec
+        run: python3.11 -m PyInstaller pyRacerz.spec
 
       - name: Zip artifact
         run: cd dist && zip -r ../pyRacerz-Linux-x86_64.zip .
