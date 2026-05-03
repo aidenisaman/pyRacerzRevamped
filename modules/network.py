@@ -40,6 +40,8 @@ Message types used by the game
               "br":0,"sl":0,"bl":0}                    any direction, per frame
                                                         (pid=0 host; pid>0 client)
   finish   : {"type":"finish"}                         host → all, race over
+  start_seq : {"type":"start_seq", "state":"grey"|"red"|"orange"|"green"}
+                                                        host → all, countdown light state
   lobby_close : {"type":"lobby_close"}                host → all, lobby closed by host
   bye      : {"type":"bye"}                            client → host on leave
 

@@ -47,8 +47,33 @@ def _draw_chat_overlay(chat_log, input_line=None):
     misc.screen.blit(surf, (4, y))
 
 
-def _run_start_sequence(ct, play=None):
-  """Render pre-race name blink and traffic lights, then clear queued keys."""
+def _load_countdown_sound():
+  """Load countdown sound from project sounds folder."""
+  countdown_sound = None
+  for candidate in (
+      "mixkit-melodic-race-countdown-1955.wav",
+      "countdown_go.wav",
+      "race_start.wav",
+      "countdown_3.wav",
+      "countdown_2.wav",
+      "countdown_1.wav",
+  ):
+      cand_path = os.path.join("sounds", candidate)
+      if os.path.exists(cand_path):
+          try:
+              countdown_sound = pygame.mixer.Sound(cand_path)
+              return countdown_sound
+          except Exception:
+              pass
+  return None
+
+
+def _run_start_sequence(ct, play=None, broadcast_fn=None):
+  """Render pre-race name blink and traffic lights, then clear queued keys.
+  
+  If broadcast_fn is provided, call it with {'type': 'start_seq', 'state': ...}
+  to synchronize light state across network.
+  """
   if play is not None:
     for _ in range(4):
       misc.screen.blit(ct.track, (0, 0))
@@ -66,17 +91,51 @@ def _run_start_sequence(ct, play=None):
     pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
   img_red = pygame.transform.rotozoom(
     pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+  img_orange = pygame.transform.rotozoom(
+    pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
+  img_green = pygame.transform.rotozoom(
+    pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
 
+  countdown_sound = _load_countdown_sound()
+  
+  # Play countdown sound once at the start of the sequence
+  if countdown_sound:
+    try:
+      countdown_sound.play()
+    except Exception:
+      pass
+
+  # Grey state
   misc.screen.blit(ct.track, (0, 0))
   misc.screen.blit(img_grey, (int(10 * misc.zoom), int(10 * misc.zoom)))
   misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
   misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
   pygame.display.flip()
+  if broadcast_fn:
+    broadcast_fn({"type": "start_seq", "state": "grey"})
   pygame.time.delay(1000)
+
+  # Red, Orange, Green sequence
   for k in range(3):
     misc.screen.blit(ct.track, (0, 0))
-    for j in range(k + 1):
-      misc.screen.blit(img_red, (int((10 + 80 * j) * misc.zoom), int(10 * misc.zoom)))
+    if k == 0:
+      misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      if broadcast_fn:
+        broadcast_fn({"type": "start_seq", "state": "red"})
+    elif k == 1:
+      misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_orange, (int(90 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      if broadcast_fn:
+        broadcast_fn({"type": "start_seq", "state": "orange"})
+    elif k == 2:
+      misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_orange, (int(90 * misc.zoom), int(10 * misc.zoom)))
+      misc.screen.blit(img_green, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      if broadcast_fn:
+        broadcast_fn({"type": "start_seq", "state": "green"})
     pygame.display.flip()
     pygame.time.delay(1000)
 
@@ -282,7 +341,14 @@ class NetworkHostRace:
     popUp    = misc.PopUp(ct)
     collision_grid = collision.SpatialGrid(int(64 * misc.zoom))
 
-    _run_start_sequence(ct, play)
+    # Start countdown with broadcast sync
+    def broadcast_countdown(msg):
+      self.server.broadcast(msg)
+    _run_start_sequence(ct, play, broadcast_fn=broadcast_countdown)
+    
+    # Start race music
+    misc.startRaceMusic(ct.name)
+    
     self.server.broadcast({"type": "go"})
 
     # ── main race loop ───────────────────────────────────────────────
@@ -764,8 +830,19 @@ class NetworkClientRace:
     aborted    = False
     finish_msg = None
     race_started = False
+    
+    # Traffic light state on client
+    light_state = "grey"
+    img_grey = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "grey.png")).convert_alpha(), 0, misc.zoom)
+    img_red = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "red.png")).convert_alpha(), 0, misc.zoom)
+    img_orange = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "orange.png")).convert_alpha(), 0, misc.zoom)
+    img_green = pygame.transform.rotozoom(
+      pygame.image.load(os.path.join("sprites", "green.png")).convert_alpha(), 0, misc.zoom)
 
-    _run_start_sequence(ct, play)
+    _run_start_sequence(ct, play, broadcast_fn=None)
 
     misc.screen.blit(ct.track, (0, 0))
     hint_surf = misc.popUpFont.render("[T] Chat   [ESC] Leave", 1, misc.darkColor, (0, 0, 0))
@@ -910,8 +987,12 @@ class NetworkClientRace:
           finish_msg = msg
           running = False
 
+        elif mtype == "start_seq":
+          light_state = msg.get("state", "grey")
+
         elif mtype == "go":
           race_started = True
+          misc.startRaceMusic(ct.name)
 
       # Interpolate remote racers toward authoritative host state
       for pid, rp in remote_cars.items():
@@ -949,6 +1030,24 @@ class NetworkClientRace:
         _apply_tunnel_mask(ct, car, rp.lastCheckpoint)
         car.sprite.draw(misc.screen)
       ct.track.unlock()
+
+      # Draw traffic lights based on current phase
+      if light_state == "grey":
+        misc.screen.blit(img_grey, (int(10 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      elif light_state == "red":
+        misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(90 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      elif light_state == "orange":
+        misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_orange, (int(90 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_grey, (int(170 * misc.zoom), int(10 * misc.zoom)))
+      elif light_state == "green":
+        misc.screen.blit(img_red, (int(10 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_orange, (int(90 * misc.zoom), int(10 * misc.zoom)))
+        misc.screen.blit(img_green, (int(170 * misc.zoom), int(10 * misc.zoom)))
 
       _draw_chat_overlay(chat_log, chat_input.render_text() if is_typing else None)
       if not race_started:
