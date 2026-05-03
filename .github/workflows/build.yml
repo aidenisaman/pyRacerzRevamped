@@ -32,7 +32,7 @@ jobs:
       uses: sayyid5416/pyinstaller@v1
       with:
         spec: 'pyRacerz.spec'
-        requirements: ''
+        requirements: 'requirements.txt'
         python_ver: '3.11'
         pyinstaller_ver: ''
         exe_path: './dist'
