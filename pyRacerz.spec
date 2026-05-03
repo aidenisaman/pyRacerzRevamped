@@ -29,15 +29,14 @@ a = Analysis(
     excludedimports=[],
     noarchive=False,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="pyRacerz",
     debug=False,
     bootloader_ignore_signals=False,
@@ -51,6 +50,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
@@ -61,3 +61,4 @@ coll = COLLECT(
     upx_exclude=[],
     name="pyRacerz",
 )
+
